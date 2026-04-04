@@ -1,0 +1,93 @@
+#compdef gitwt
+# gitwt zsh completion
+# Source this file in your .zshrc (after sourcing gitwt.sh):
+#   source ~/.config/gitwt/_gitwt
+
+_gitwt() {
+  local state
+
+  _arguments \
+    '1: :->cmd' \
+    '*: :->args' \
+    && return 0
+
+  case "$state" in
+    cmd)
+      local -a commands
+      commands=(
+        'new:Branch off current (or --from <base>), create worktree, and cd in'
+        'add:Create a new worktree for an existing branch'
+        'switch:cd into an existing worktree'
+        'sw:cd into an existing worktree (alias for switch)'
+        'remove:Remove a worktree'
+        'list:List all worktrees'
+        'ls:List all worktrees (alias for list)'
+        'help:Show help'
+      )
+      _describe 'command' commands
+      ;;
+
+    args)
+      case "${words[2]}" in
+        new)              _gitwt_complete_new ;;
+        add)              _gitwt_complete_add ;;
+        switch|sw|remove) _gitwt_complete_worktree_branches ;;
+      esac
+      ;;
+  esac
+}
+
+# `new` — free-form branch name for the new branch, with --from and --pull flags
+_gitwt_complete_new() {
+  local -a flags all_branches
+
+  # If the previous word is --from, complete with local branch names
+  if [[ "${words[-2]}" == "--from" ]]; then
+    all_branches=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)}")
+    compadd -a all_branches
+    return
+  fi
+
+  # Otherwise suggest flags (only ones not already used)
+  local used="${words[*]}"
+  [[ "$used" != *"--from"* ]] && flags+=(--from)
+  [[ "$used" != *"--pull"* ]] && flags+=(--pull)
+
+  # Only offer flags once a branch name has been typed
+  if [[ ${#words[@]} -gt 3 ]] && [[ ${#flags[@]} -gt 0 ]]; then
+    compadd -a flags
+  fi
+}
+
+# `add` — complete from local branches not already checked out as a worktree
+_gitwt_complete_add() {
+  local -a checked_out all_branches available
+
+  checked_out=("${(@f)$(git worktree list --porcelain 2>/dev/null \
+    | awk '/^branch / { sub(/^refs\/heads\//, "", $2); print $2 }')}")
+
+  all_branches=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)}")
+
+  local b c skip
+  for b in "${all_branches[@]}"; do
+    skip=0
+    for c in "${checked_out[@]}"; do
+      [[ "$b" == "$c" ]] && skip=1 && break
+    done
+    (( skip )) || available+=("$b")
+  done
+
+  compadd -a available
+}
+
+# `switch` / `remove` — complete from branches that have a live worktree
+_gitwt_complete_worktree_branches() {
+  local -a branches
+
+  branches=("${(@f)$(git worktree list --porcelain 2>/dev/null \
+    | awk '/^branch / { sub(/^refs\/heads\//, "", $2); print $2 }')}")
+
+  compadd -a branches
+}
+
+compdef _gitwt gitwt
