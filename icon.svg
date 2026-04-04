@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128">
+  <!-- Black background -->
+  <rect width="128" height="128" rx="22" fill="#000000"/>
+  <rect x="2" y="2" width="124" height="124" rx="20" fill="none" stroke="white" stroke-width="2"/>
+
+  <!-- All content scaled to 90%, centered -->
+  <g transform="translate(64,64) scale(0.9) translate(-64,-64)">
+
+    <!-- Main trunk: root (bottom) straight up to top node -->
+    <line x1="64" y1="110" x2="64" y2="18" stroke="white" stroke-width="7.5" stroke-linecap="round"/>
+
+    <!-- Left branch: starts going left from trunk, curves smoothly up to node -->
+    <path d="M64,82 C38,82 22,76 22,62" stroke="white" stroke-width="7.5" fill="none" stroke-linecap="round"/>
+
+    <!-- Right branch: starts going right from trunk, curves smoothly up to node -->
+    <path d="M64,54 C88,54 106,46 106,30" stroke="white" stroke-width="7.5" fill="none" stroke-linecap="round"/>
+
+    <!-- Root node at bottom (donut) -->
+    <circle cx="64" cy="110" r="12" fill="white"/>
+    <circle cx="64" cy="110" r="5.5" fill="black"/>
+
+    <!-- Top node on main trunk (donut) -->
+    <circle cx="64" cy="18" r="12" fill="white"/>
+    <circle cx="64" cy="18" r="5.5" fill="black"/>
+
+    <!-- Left side node (donut) -->
+    <circle cx="22" cy="62" r="12" fill="white"/>
+    <circle cx="22" cy="62" r="5.5" fill="black"/>
+
+    <!-- Right side node — large green circle almost touching white ring -->
+    <circle cx="106" cy="30" r="12" fill="white"/>
+    <circle cx="106" cy="30" r="9.5" fill="#238636"/>
+    <!-- Larger checkmark, nearly fills the green circle -->
+    <polyline points="100.5,30 104.5,34.5 113,23" stroke="white" stroke-width="2.8" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+
+  </g>
+</svg>

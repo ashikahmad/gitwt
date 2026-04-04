@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="icon.svg" width="96" height="96" alt="gitwt icon"/>
+</p>
+
 # gitwt
 
 A friendly shell wrapper around `git worktree` that makes working with multiple worktrees fast and intuitive.
