@@ -175,6 +175,18 @@ The `install.sh` script adds the completion source line to `.zshrc` automaticall
 
 ---
 
+## Pro tip: shorter alias
+
+If you find yourself typing `gitwt` a lot, you can add a shorter alias to your `~/.bashrc` or `~/.zshrc`:
+
+```bash
+alias gwt="gitwt"
+```
+
+Then use `gwt` everywhere instead — `gwt new feature/dark-mode`, `gwt sw main`, etc.
+
+---
+
 ## Requirements
 
 - Git 2.5+ (worktree support)
