@@ -1,6 +1,4 @@
-<p align="center">
-  <img src="icon.svg" width="96" height="96" alt="gitwt icon"/>
-</p>
+![gitwt icon](icon.svg)
 
 # gitwt
 
