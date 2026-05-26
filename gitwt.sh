@@ -337,7 +337,10 @@ _gitwt_list() {
     esac
   done < <(git worktree list --porcelain)
 
-  (( stale )) && echo "" && echo "Tip: stale entries detected — run 'git worktree prune' to clean up."
+  if (( stale )); then
+    echo ""
+    echo "Tip: stale entries detected — run 'git worktree prune' to clean up."
+  fi
 }
 
 _gitwt_help() {
