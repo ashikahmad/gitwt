@@ -68,6 +68,12 @@ _gitwt_find_path() {
     return 1
   fi
 
+  if [[ ! -d "$found" ]]; then
+    echo "Error: worktree path no longer exists: $found" >&2
+    echo "Tip: run 'git worktree prune' to clean up stale entries." >&2
+    return 1
+  fi
+
   echo "$found"
 }
 
@@ -284,21 +290,30 @@ _gitwt_list() {
   printf "%-40s %s\n" "BRANCH" "PATH"
   printf "%-40s %s\n" "──────────────────────────────────────" "──────────────────────────────────────"
 
-  git worktree list --porcelain | awk -v base="$parent_of_main" '
-    /^worktree / { path = substr($0, 10) }
-    /^branch /   { branch = substr($0, 8); sub(/^refs\/heads\//, "", branch) }
-    /^HEAD /     { head = substr($0, 6) }
-    /^$/          {
-      if (path != "") {
-        display = (branch != "") ? branch : "(detached:" substr(head, 1, 7) ")"
-        rel = path
-        if (index(path, base "/") == 1)
-          rel = substr(path, length(base) + 2)
-        printf "%-40s %s\n", display, rel
-      }
-      path = ""; branch = ""; head = ""
-    }
-  '
+  local wt_path="" branch="" head="" stale=0
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*) wt_path="${line#worktree }" ;;
+      "HEAD "*)     head="${line#HEAD }" ;;
+      "branch "*)   branch="${line#branch }"; branch="${branch#refs/heads/}" ;;
+      "")
+        if [[ -n "$wt_path" ]]; then
+          local display="${branch:-(detached:${head:0:7})}"
+          local rel="$wt_path"
+          [[ "$wt_path" == "$parent_of_main/"* ]] && rel="${wt_path#$parent_of_main/}"
+          if [[ ! -d "$wt_path" ]]; then
+            printf "%-40s %s\n" "(stale)" "$rel"
+            stale=1
+          else
+            printf "%-40s %s\n" "$display" "$rel"
+          fi
+        fi
+        wt_path=""; branch=""; head=""
+        ;;
+    esac
+  done < <(git worktree list --porcelain)
+
+  (( stale )) && echo "" && echo "Tip: stale entries detected — run 'git worktree prune' to clean up."
 }
 
 _gitwt_status() {
@@ -319,7 +334,7 @@ _gitwt_status() {
     "────────────────────────────" \
     "──────────────────────────────────────"
 
-  local wt_path="" branch="" head="" is_detached=""
+  local wt_path="" branch="" head="" is_detached="" stale=0
   while IFS= read -r line; do
     case "$line" in
       "worktree "*) wt_path="${line#worktree }" ;;
@@ -328,6 +343,15 @@ _gitwt_status() {
       "detached")   is_detached=1 ;;
       "")
         if [[ -n "$wt_path" ]]; then
+          if [[ ! -d "$wt_path" ]]; then
+            local rel="$wt_path"
+            [[ "$wt_path" == "$parent_of_main/"* ]] && rel="${wt_path#$parent_of_main/}"
+            printf "%-40s %-26s %-30s %s\n" "(stale)" "-" "-" "$rel"
+            wt_path=""; branch=""; head=""; is_detached=""
+            stale=1
+            continue
+          fi
+
           local display_branch="${branch:-(detached:${head:0:7})}"
 
           local rel="$wt_path"
@@ -373,6 +397,8 @@ _gitwt_status() {
         ;;
     esac
   done < <(git worktree list --porcelain)
+
+  (( stale )) && echo "" && echo "Tip: stale entries detected — run 'git worktree prune' to clean up."
 }
 
 _gitwt_help() {
