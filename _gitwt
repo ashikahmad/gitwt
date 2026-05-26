@@ -29,9 +29,10 @@ _gitwt() {
 
     args)
       case "${words[2]}" in
-        new)              _gitwt_complete_new ;;
-        add)              _gitwt_complete_add ;;
-        switch|sw|remove) _gitwt_complete_worktree_branches ;;
+        new)       _gitwt_complete_new ;;
+        add)       _gitwt_complete_add ;;
+        switch|sw) _gitwt_complete_worktree_branches ;;
+        remove)    _gitwt_complete_remove ;;
       esac
       ;;
   esac
@@ -79,7 +80,7 @@ _gitwt_complete_add() {
   compadd -a available
 }
 
-# `switch` / `remove` — complete from branches that have a live worktree
+# `switch` — complete from branches that have a live worktree
 _gitwt_complete_worktree_branches() {
   local -a branches
 
@@ -87,6 +88,19 @@ _gitwt_complete_worktree_branches() {
     | awk '/^branch / { sub(/^refs\/heads\//, "", $2); print $2 }')}")
 
   compadd -a branches
+}
+
+# `remove` — worktree branches + --branch flag
+_gitwt_complete_remove() {
+  local -a branches
+
+  branches=("${(@f)$(git worktree list --porcelain 2>/dev/null \
+    | awk '/^branch / { sub(/^refs\/heads\//, "", $2); print $2 }')}")
+
+  compadd -a branches
+
+  local used="${words[*]}"
+  [[ "$used" != *"--branch"* ]] && compadd -- --branch
 }
 
 compdef _gitwt gitwt

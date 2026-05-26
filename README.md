@@ -103,7 +103,10 @@ Remove a worktree. If your shell is currently inside that worktree, it automatic
 
 ```bash
 gitwt remove feature/dark-mode
+gitwt remove feature/dark-mode --branch   # also delete the local branch
 ```
+
+The `--branch` flag uses a safe delete (`git branch -d`) — it will refuse to delete a branch with unmerged commits.
 
 ### `gitwt list` (alias: `ls`)
 

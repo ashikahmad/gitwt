@@ -224,9 +224,17 @@ _gitwt_switch() {
 }
 
 _gitwt_remove() {
-  local branch="$1"
+  local branch="" delete_branch=0
+
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      --branch) delete_branch=1 ; shift ;;
+      *)        branch="$1" ; shift ;;
+    esac
+  done
+
   if [[ -z "$branch" ]]; then
-    echo "Usage: gitwt remove <type/branch-name>" >&2
+    echo "Usage: gitwt remove <type/branch-name> [--branch]" >&2
     echo "Example: gitwt remove fix/checkin-timeout-issue-103" >&2
     return 1
   fi
@@ -246,11 +254,18 @@ _gitwt_remove() {
   fi
 
   echo "Removing worktree: $worktree_path"
-  if git worktree remove "$worktree_path"; then
-    echo "Worktree removed."
-  else
+  if ! git worktree remove "$worktree_path"; then
     echo "Tip: if there are uncommitted changes, use: git worktree remove --force $worktree_path" >&2
     return 1
+  fi
+  echo "Worktree removed."
+
+  if (( delete_branch )); then
+    if git branch -d "$branch"; then
+      echo "Branch '$branch' deleted."
+    else
+      echo "Tip: branch has unmerged commits — use 'git branch -D $branch' to force delete." >&2
+    fi
   fi
 }
 
@@ -310,6 +325,8 @@ COMMANDS
   remove <type/branch-name>   Remove a worktree (looked up from git). If your shell
                               is currently inside it, you'll be cd'd back to the
                               main repo automatically.
+                              Flags:
+                                --branch        also delete the local branch
 
   list                        List all worktrees as "branch  relativePath".
                               Alias: ls
