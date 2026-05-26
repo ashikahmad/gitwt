@@ -271,14 +271,16 @@ _gitwt_list() {
   git worktree list --porcelain | awk -v base="$parent_of_main" '
     /^worktree / { path = substr($0, 10) }
     /^branch /   { branch = substr($0, 8); sub(/^refs\/heads\//, "", branch) }
+    /^HEAD /     { head = substr($0, 6) }
     /^$/          {
-      if (path != "" && branch != "") {
+      if (path != "") {
+        display = (branch != "") ? branch : "(detached:" substr(head, 1, 7) ")"
         rel = path
         if (index(path, base "/") == 1)
           rel = substr(path, length(base) + 2)
-        printf "%-40s %s\n", branch, rel
+        printf "%-40s %s\n", display, rel
       }
-      path = ""; branch = ""
+      path = ""; branch = ""; head = ""
     }
   '
 }
