@@ -8,7 +8,6 @@ gitwt() {
 
   case "$cmd" in
     new)       _gitwt_new    "${@:2}" ;;
-    add)       _gitwt_add    "${@:2}" ;;
     remove)    _gitwt_remove "${@:2}" ;;
     switch|sw) _gitwt_switch "${@:2}" ;;
     list|ls)   _gitwt_list ;;
@@ -24,7 +23,7 @@ _gitwt_main_repo_root() {
     | awk 'NR==1 { sub(/^worktree /, ""); print; exit }'
 }
 
-# Used only by `add` — generates the conventional target path for new worktrees
+# Generates the conventional target path for new worktrees
 _gitwt_generate_path() {
   local branch="$1"   # e.g. fix/checkin-timeout-issue-103
 
@@ -79,29 +78,56 @@ _gitwt_find_path() {
 # ── subcommands ────────────────────────────────────────────────────────────────
 
 _gitwt_new() {
-  local branch="" from_branch="" do_pull=0
+  local branch="" from_branch="" do_fetch=0
 
-  # Parse args — accept --fetch and --from <branch> anywhere
-  local arg
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --fetch) do_pull=1 ; shift ;;
-      --from)  from_branch="$2" ; shift 2 ;;
+      --fetch)  do_fetch=1 ; shift ;;
+      --from)   from_branch="$2" ; shift 2 ;;
       --from=*) from_branch="${1#--from=}" ; shift ;;
-      *)       branch="$1" ; shift ;;
+      *)        branch="$1" ; shift ;;
     esac
   done
 
   if [[ -z "$branch" ]]; then
-    echo "Usage: gitwt new <type/branch-name> [--from <base-branch>] [--fetch]" >&2
+    echo "Usage: gitwt new <branch-name> [--from <base>] [--fetch]" >&2
     echo "Example: gitwt new feature/dark-mode --from develop" >&2
     return 1
   fi
 
-  # Determine base branch — explicit --from or current branch
+  # If branch already has a worktree, suggest switch
+  if git worktree list --porcelain 2>/dev/null | awk '/^branch / { sub(/^refs\/heads\//, "", $2); print $2 }' | grep -qxF "$branch"; then
+    echo "Error: branch '$branch' already has a worktree. Use 'gitwt switch $branch' instead." >&2
+    return 1
+  fi
+
+  local worktree_path
+  worktree_path="$(_gitwt_generate_path "$branch")" || return 1
+
+  if [[ -d "$worktree_path" ]]; then
+    echo "Error: worktree path already exists: $worktree_path" >&2
+    echo "Tip: run 'gitwt list' to see all registered worktrees." >&2
+    return 1
+  fi
+
+  # Branch already exists locally — just attach a worktree, no branch creation
+  if git show-ref --verify --quiet "refs/heads/$branch"; then
+    if [[ -n "$from_branch" || "$do_fetch" -eq 1 ]]; then
+      echo "Note: --from and --fetch are ignored when the branch already exists." >&2
+    fi
+    echo "Branch '$branch' exists — creating worktree at: $worktree_path"
+    if git worktree add "$worktree_path" "$branch"; then
+      echo "Done! Switching into it now..."
+      cd "$worktree_path" || return 1
+    else
+      return 1
+    fi
+    return 0
+  fi
+
+  # Branch does not exist — create it from a base branch
   local base_branch
   if [[ -n "$from_branch" ]]; then
-    # Validate the given base branch exists
     if ! git show-ref --verify --quiet "refs/heads/$from_branch"; then
       echo "Error: base branch '$from_branch' does not exist locally." >&2
       return 1
@@ -115,8 +141,7 @@ _gitwt_new() {
     fi
   fi
 
-  # Optionally fetch the base branch and resolve divergence
-  if (( do_pull )); then
+  if (( do_fetch )); then
     local remote
     remote="$(git config "branch.${base_branch}.remote" 2>/dev/null || echo "origin")"
     local remote_ref="$remote/$base_branch"
@@ -158,55 +183,8 @@ _gitwt_new() {
     fi
   fi
 
-  # Refuse if the new branch already exists
-  if git show-ref --verify --quiet "refs/heads/$branch"; then
-    echo "Error: branch '$branch' already exists. Use 'gitwt add $branch' instead." >&2
-    return 1
-  fi
-
-  local worktree_path
-  worktree_path="$(_gitwt_generate_path "$branch")" || return 1
-
-  if [[ -d "$worktree_path" ]]; then
-    echo "Error: worktree path already exists: $worktree_path" >&2
-    return 1
-  fi
-
   echo "Creating '$branch' from '$base_branch' at: $worktree_path"
   if git worktree add -b "$branch" "$worktree_path" "$base_branch"; then
-    echo "Done! Switching into it now..."
-    cd "$worktree_path" || return 1
-  else
-    return 1
-  fi
-}
-
-_gitwt_add() {
-  local branch="$1"
-  if [[ -z "$branch" ]]; then
-    echo "Usage: gitwt add <type/branch-name>" >&2
-    echo "Example: gitwt add fix/checkin-timeout-issue-103" >&2
-    return 1
-  fi
-
-  local worktree_path
-  worktree_path="$(_gitwt_generate_path "$branch")" || return 1
-
-  if [[ -d "$worktree_path" ]]; then
-    echo "Error: worktree path already exists: $worktree_path" >&2
-    return 1
-  fi
-
-  # Check if branch already exists locally
-  local git_cmd
-  if git show-ref --verify --quiet "refs/heads/$branch"; then
-    git_cmd=(git worktree add "$worktree_path" "$branch")
-  else
-    git_cmd=(git worktree add -b "$branch" "$worktree_path")
-  fi
-
-  echo "Creating worktree at: $worktree_path"
-  if "${git_cmd[@]}"; then
     echo "Done! Switching into it now..."
     cd "$worktree_path" || return 1
   else
@@ -368,21 +346,19 @@ USAGE
   gitwt <command> [args]
 
 COMMANDS
-  new <type/branch-name>      Branch off the current branch (or --from <base>),
-                              create a worktree, and cd into it immediately.
-                              Flags:
+  new <branch-name>           Create a worktree and cd into it immediately.
+                              If the branch already exists locally, just attaches
+                              a worktree. If not, creates the branch first.
+                              Flags (only apply when creating a new branch):
                                 --from <base>   branch off <base> instead of current
                                 --fetch         fetch the base branch first; if diverged,
                                                 asks whether to branch from remote or local
 
-  add <type/branch-name>      Create a new worktree at the conventional path:
-                                ../worktrees/<repoName>/<type>-<branch-name>
-
-  switch <type/branch-name>   cd into an existing worktree (looked up from git,
+  switch <branch-name>        cd into an existing worktree (looked up from git,
                               so works for any worktree, not just ones gitwt created).
                               Alias: sw
 
-  remove <type/branch-name>   Remove a worktree (looked up from git). If your shell
+  remove <branch-name>        Remove a worktree (looked up from git). If your shell
                               is currently inside it, you'll be cd'd back to the
                               main repo automatically.
                               Flags:
@@ -394,26 +370,26 @@ COMMANDS
 
   help                        Show this message.
 
-WORKTREE PATH LAYOUT (for `add`)
+WORKTREE PATH LAYOUT
   New worktrees are placed at:
     ../worktrees/<repoName>/<type>-<branch-name>
 
   Examples:
-    gitwt add fix/checkin-timeout-issue-103
+    gitwt new fix/checkin-timeout-issue-103
     → ../worktrees/awesomeRepo/fix-checkin-timeout-issue-103
 
-    gitwt add feature/dark-mode
+    gitwt new feature/dark-mode
     → ../worktrees/awesomeRepo/feature-dark-mode
 
 TYPICAL WORKFLOW
-    gitwt ls                              # see all worktrees
-    gitwt new feature/dark-mode                     # branch off current + worktree + cd in
-    gitwt new feature/dark-mode --from develop        # branch off develop instead
-    gitwt new feature/dark-mode --from main --fetch  # fetch main first, then branch off it
-    gitwt add feature/dark-mode           # worktree for an existing branch
-    gitwt sw feature/dark-mode            # jump into an existing worktree
-    gitwt sw main                         # jump to any branch, even manually added ones
-    gitwt remove feature/dark-mode        # done — jumps back to main repo if needed
+    gitwt ls                                        # see all worktrees
+    gitwt new feature/dark-mode                     # new branch off current + worktree + cd in
+    gitwt new feature/dark-mode --from develop      # branch off develop instead
+    gitwt new feature/dark-mode --from main --fetch # fetch main first, then branch off it
+    gitwt new fix/existing-branch                   # existing branch — just attach worktree
+    gitwt sw feature/dark-mode                      # jump into an existing worktree
+    gitwt sw main                                   # jump to any branch
+    gitwt remove feature/dark-mode                  # done — jumps back to main repo if needed
 
 INSTALL
   1. Place this file somewhere permanent, e.g.:

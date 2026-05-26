@@ -15,8 +15,7 @@ _gitwt() {
     cmd)
       local -a commands
       commands=(
-        'new:Branch off current (or --from <base>), create worktree, and cd in'
-        'add:Create a new worktree for an existing branch'
+        'new:Create worktree for a new or existing branch, and cd in'
         'switch:cd into an existing worktree'
         'sw:cd into an existing worktree (alias for switch)'
         'remove:Remove a worktree'
@@ -30,7 +29,6 @@ _gitwt() {
     args)
       case "${words[2]}" in
         new)       _gitwt_complete_new ;;
-        add)       _gitwt_complete_add ;;
         switch|sw) _gitwt_complete_worktree_branches ;;
         remove)    _gitwt_complete_remove ;;
       esac
@@ -38,9 +36,9 @@ _gitwt() {
   esac
 }
 
-# `new` — free-form branch name for the new branch, with --from and --pull flags
+# `new` — suggest existing branches without worktrees, plus --from / --fetch flags
 _gitwt_complete_new() {
-  local -a flags all_branches
+  local -a flags checked_out all_branches available
 
   # If the previous word is --from, complete with local branch names
   if [[ "${words[-2]}" == "--from" ]]; then
@@ -49,23 +47,9 @@ _gitwt_complete_new() {
     return
   fi
 
-  # Otherwise suggest flags (only ones not already used)
-  local used="${words[*]}"
-  [[ "$used" != *"--from"* ]] && flags+=(--from)
-  [[ "$used" != *"--fetch"* ]] && flags+=(--fetch)
-
-  if [[ ${#flags[@]} -gt 0 ]]; then
-    compadd -a flags
-  fi
-}
-
-# `add` — complete from local branches not already checked out as a worktree
-_gitwt_complete_add() {
-  local -a checked_out all_branches available
-
+  # Suggest existing branches that don't already have a worktree
   checked_out=("${(@f)$(git worktree list --porcelain 2>/dev/null \
     | awk '/^branch / { sub(/^refs\/heads\//, "", $2); print $2 }')}")
-
   all_branches=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)}")
 
   local b c skip
@@ -76,8 +60,13 @@ _gitwt_complete_add() {
     done
     (( skip )) || available+=("$b")
   done
+  [[ ${#available[@]} -gt 0 ]] && compadd -a available
 
-  compadd -a available
+  # Suggest flags not already used
+  local used="${words[*]}"
+  [[ "$used" != *"--from"* ]] && flags+=(--from)
+  [[ "$used" != *"--fetch"* ]] && flags+=(--fetch)
+  [[ ${#flags[@]} -gt 0 ]] && compadd -a flags
 }
 
 # `switch` — complete from branches that have a live worktree

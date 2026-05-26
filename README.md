@@ -10,8 +10,7 @@ Instead of remembering long `git worktree` paths and flags, `gitwt` gives you si
 
 ## Features
 
-- **`new`** — branch off the current (or any) branch, create a worktree, and `cd` into it in one command
-- **`add`** — set up a worktree for an existing branch at a predictable path layout
+- **`new`** — create a worktree and `cd` into it in one command; auto-detects whether to create a new branch or attach to an existing one
 - **`switch` / `sw`** — jump into any worktree by branch name
 - **`remove`** — tear down a worktree; auto-returns you to the main repo if you're inside it
 - **`list` / `ls`** — clean table of all worktrees with branch and relative path
@@ -71,22 +70,19 @@ gitwt <command> [args]
 
 ### `gitwt new <branch-name>`
 
-Branch off the current branch (or `--from <base>`), create a worktree, and `cd` into it immediately.
+Create a worktree and `cd` into it immediately. Smart about the branch:
+
+- **Branch doesn't exist** — creates it first (from current branch, or `--from <base>`), then creates the worktree
+- **Branch already exists** — skips branch creation and just attaches a worktree
 
 ```bash
-gitwt new feature/dark-mode                         # branch off current branch
-gitwt new feature/dark-mode --from develop          # branch off develop
+gitwt new feature/dark-mode                         # new branch off current branch
+gitwt new feature/dark-mode --from develop          # new branch off develop
 gitwt new feature/dark-mode --from main --fetch     # fetch main first, then branch off it
+gitwt new fix/existing-branch                       # existing branch — just attach worktree
 ```
 
-### `gitwt add <branch-name>`
-
-Create a worktree for an **existing** branch at the conventional path layout.
-
-```bash
-gitwt add fix/checkin-timeout-issue-103
-# → ../worktrees/<repoName>/fix-checkin-timeout-issue-103
-```
+`--from` and `--fetch` are ignored when the branch already exists.
 
 ### `gitwt switch <branch-name>` (alias: `sw`)
 
@@ -129,7 +125,7 @@ fix/auth                                 1 ahead · 2 behind         2 modified 
 Worktrees are placed at a predictable location relative to your main repo:
 
 ```
-../worktrees/<repoName>/<type>-<branch-name>
+../worktrees/<repoName>/<type>-<rest-of-branch-name>
 ```
 
 Examples:
@@ -154,8 +150,8 @@ gitwt new feature/dark-mode
 # Start from a specific base branch
 gitwt new feature/dark-mode --from develop --fetch
 
-# Add a worktree for an existing branch
-gitwt add fix/login-bug
+# Attach a worktree to an existing branch (no --from or --fetch needed)
+gitwt new fix/existing-branch
 
 # Jump between worktrees
 gitwt sw main
@@ -172,8 +168,7 @@ gitwt remove feature/dark-mode
 The `_gitwt` completion script provides context-aware tab-completion:
 
 - Subcommand names are completed after `gitwt `
-- `gitwt new` suggests `--from` and `--fetch` flags; completing after `--from` lists local branches
-- `gitwt add` lists local branches that don't already have a worktree
+- `gitwt new` suggests local branches that don't already have a worktree, plus `--from` and `--fetch` flags; completing after `--from` lists local branches
 - `gitwt switch` and `gitwt remove` list only branches that have an active worktree
 
 The `install.sh` script adds the completion source line to `.zshrc` automatically.
