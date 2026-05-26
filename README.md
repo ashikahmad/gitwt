@@ -8,6 +8,21 @@ Instead of remembering long `git worktree` paths and flags, `gitwt` gives you si
 
 ---
 
+## Why gitwt?
+
+**`git worktree` is powerful but awkward to use directly.** You have to supply full filesystem paths, remember where you put each worktree, and run separate commands to create a branch and attach it. `gitwt` fixes that with three core ideas:
+
+**1. Think in branches, not paths.**<br/>
+With plain `git worktree`, you manage paths. With `gitwt`, you name a branch — `gitwt sw feature/dark-mode` — and it finds the right directory for you. No memorising where you put things.
+
+**2. Worktrees live outside your repo, automatically.**<br/>
+Every worktree lands at `../worktrees/<repo>/<branch-slug>` — a predictable location next to your main repo. Your repo's own directory stays clean (no sibling folders cluttering the tree), and all worktrees for a project are grouped in one place.
+
+**3. Branch and worktree in a single command, without switching first.**<br/>
+With raw git you'd need to `git checkout develop && git pull && git checkout -b my-feature` before creating a worktree. `gitwt new my-feature --from develop --fetch` does it all in one shot from wherever you are — no need to leave your current branch.
+
+---
+
 ## Features
 
 - **`new`** — create a worktree and `cd` into it in one command; auto-detects whether to create a new branch or attach to an existing one
