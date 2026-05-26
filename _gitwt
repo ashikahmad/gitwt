@@ -51,7 +51,7 @@ _gitwt_complete_new() {
   # Otherwise suggest flags (only ones not already used)
   local used="${words[*]}"
   [[ "$used" != *"--from"* ]] && flags+=(--from)
-  [[ "$used" != *"--pull"* ]] && flags+=(--pull)
+  [[ "$used" != *"--fetch"* ]] && flags+=(--fetch)
 
   # Only offer flags once a branch name has been typed
   if [[ ${#words[@]} -gt 3 ]] && [[ ${#flags[@]} -gt 0 ]]; then

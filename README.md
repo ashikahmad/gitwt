@@ -74,9 +74,9 @@ gitwt <command> [args]
 Branch off the current branch (or `--from <base>`), create a worktree, and `cd` into it immediately.
 
 ```bash
-gitwt new feature/dark-mode                        # branch off current branch
-gitwt new feature/dark-mode --from develop         # branch off develop
-gitwt new feature/dark-mode --from main --pull     # pull main first, then branch off it
+gitwt new feature/dark-mode                         # branch off current branch
+gitwt new feature/dark-mode --from develop          # branch off develop
+gitwt new feature/dark-mode --from main --fetch     # fetch main first, then branch off it
 ```
 
 ### `gitwt add <branch-name>`
@@ -147,7 +147,7 @@ gitwt ls
 gitwt new feature/dark-mode
 
 # Start from a specific base branch
-gitwt new feature/dark-mode --from develop --pull
+gitwt new feature/dark-mode --from develop --fetch
 
 # Add a worktree for an existing branch
 gitwt add fix/login-bug
@@ -167,7 +167,7 @@ gitwt remove feature/dark-mode
 The `_gitwt` completion script provides context-aware tab-completion:
 
 - Subcommand names are completed after `gitwt `
-- `gitwt new` suggests `--from` and `--pull` flags; completing after `--from` lists local branches
+- `gitwt new` suggests `--from` and `--fetch` flags; completing after `--from` lists local branches
 - `gitwt add` lists local branches that don't already have a worktree
 - `gitwt switch` and `gitwt remove` list only branches that have an active worktree
 

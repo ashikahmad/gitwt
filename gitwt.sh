@@ -39,7 +39,7 @@ _gitwt_generate_path() {
     local type rest
     type="${branch%%/*}"
     rest="${branch#*/}"
-    slug="${type}-${rest}"
+    slug="${type}-${rest//\//-}"
   else
     slug="$branch"
   fi
@@ -75,11 +75,11 @@ _gitwt_find_path() {
 _gitwt_new() {
   local branch="" from_branch="" do_pull=0
 
-  # Parse args — accept --pull and --from <branch> anywhere
+  # Parse args — accept --fetch and --from <branch> anywhere
   local arg
   while [[ $# -gt 0 ]]; do
     case "$1" in
-      --pull)  do_pull=1 ; shift ;;
+      --fetch) do_pull=1 ; shift ;;
       --from)  from_branch="$2" ; shift 2 ;;
       --from=*) from_branch="${1#--from=}" ; shift ;;
       *)       branch="$1" ; shift ;;
@@ -87,7 +87,7 @@ _gitwt_new() {
   done
 
   if [[ -z "$branch" ]]; then
-    echo "Usage: gitwt new <type/branch-name> [--from <base-branch>] [--pull]" >&2
+    echo "Usage: gitwt new <type/branch-name> [--from <base-branch>] [--fetch]" >&2
     echo "Example: gitwt new feature/dark-mode --from develop" >&2
     return 1
   fi
@@ -109,19 +109,46 @@ _gitwt_new() {
     fi
   fi
 
-  # Optionally pull the base branch first
+  # Optionally fetch the base branch and resolve divergence
   if (( do_pull )); then
-    echo "Pulling '$base_branch'..."
-    # If base branch isn't current, switch to it temporarily in the main repo
-    local current_branch
-    current_branch="$(git symbolic-ref --short HEAD 2>/dev/null)"
-    if [[ "$base_branch" != "$current_branch" ]]; then
-      local main_root
-      main_root="$(_gitwt_main_repo_root)"
-      git -C "$main_root" fetch origin "$base_branch:$base_branch" \
-        || { echo "Error: could not fetch '$base_branch'." >&2; return 1; }
-    else
-      git pull || { echo "Error: git pull failed." >&2; return 1; }
+    local remote
+    remote="$(git config "branch.${base_branch}.remote" 2>/dev/null || echo "origin")"
+    local remote_ref="$remote/$base_branch"
+
+    echo "Fetching '$base_branch' from '$remote'..."
+    if ! git fetch "$remote" "$base_branch"; then
+      echo "Error: could not fetch '$base_branch' from '$remote'." >&2
+      return 1
+    fi
+
+    if git rev-parse --verify "$remote_ref" &>/dev/null; then
+      local ahead behind
+      ahead="$(git rev-list --count "${remote_ref}..${base_branch}")"
+      behind="$(git rev-list --count "${base_branch}..${remote_ref}")"
+
+      if (( ahead == 0 && behind == 0 )); then
+        echo "'$base_branch' is already up to date."
+      elif (( ahead == 0 )); then
+        echo "'$base_branch' is $behind commit(s) behind remote — branching from remote."
+        base_branch="$remote_ref"
+      elif (( behind == 0 )); then
+        echo "'$base_branch' is $ahead commit(s) ahead of remote — using local."
+      else
+        printf "\n  '%s' has diverged from '%s':\n" "$base_branch" "$remote_ref"
+        printf "    Local:  %s commit(s) ahead\n" "$ahead"
+        printf "    Remote: %s commit(s) ahead\n\n" "$behind"
+        printf "  1) Branch off %s (latest remote state)\n" "$remote_ref"
+        printf "  2) Branch off local %s\n" "$base_branch"
+        printf "  3) Abort\n"
+        printf "  Choice [1-3]: "
+        local choice
+        read -r choice
+        case "$choice" in
+          1) base_branch="$remote_ref" ;;
+          2) ;;
+          *) echo "Aborted." >&2; return 1 ;;
+        esac
+      fi
     fi
   fi
 
@@ -174,8 +201,8 @@ _gitwt_add() {
 
   echo "Creating worktree at: $worktree_path"
   if "${git_cmd[@]}"; then
-    echo "Done! Switch to it with:"
-    echo "  gitwt sw $branch"
+    echo "Done! Switching into it now..."
+    cd "$worktree_path" || return 1
   else
     return 1
   fi
@@ -268,7 +295,8 @@ COMMANDS
                               create a worktree, and cd into it immediately.
                               Flags:
                                 --from <base>   branch off <base> instead of current
-                                --pull          pull the base branch first
+                                --fetch         fetch the base branch first; if diverged,
+                                                asks whether to branch from remote or local
 
   add <type/branch-name>      Create a new worktree at the conventional path:
                                 ../worktrees/<repoName>/<type>-<branch-name>
@@ -300,8 +328,8 @@ WORKTREE PATH LAYOUT (for `add`)
 TYPICAL WORKFLOW
     gitwt ls                              # see all worktrees
     gitwt new feature/dark-mode                     # branch off current + worktree + cd in
-    gitwt new feature/dark-mode --from develop       # branch off develop instead
-    gitwt new feature/dark-mode --from main --pull   # pull main first, then branch off it
+    gitwt new feature/dark-mode --from develop        # branch off develop instead
+    gitwt new feature/dark-mode --from main --fetch  # fetch main first, then branch off it
     gitwt add feature/dark-mode           # worktree for an existing branch
     gitwt sw feature/dark-mode            # jump into an existing worktree
     gitwt sw main                         # jump to any branch, even manually added ones
