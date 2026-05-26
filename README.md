@@ -110,28 +110,16 @@ The `--branch` flag uses a safe delete (`git branch -d`) — it will refuse to d
 
 ### `gitwt list` (alias: `ls`)
 
-List all registered worktrees with their branch and relative path.
+Show all worktrees with branch, sync state (ahead/behind upstream), local changes (staged/modified/untracked), and path.
 
 ```
-BRANCH                                   PATH
-────────────────────────────────────── ──────────────────────────────────────
-main                                   myrepo
-feature/dark-mode                      worktrees/myrepo/feature-dark-mode
-fix/login-bug                          worktrees/myrepo/fix-login-bug
-```
-
-### `gitwt status`
-
-Show all worktrees with their sync state (ahead/behind upstream) and local changes (staged/modified/untracked).
-
-```
-BRANCH                                   SYNC                 CHANGES                        PATH
-──────────────────────────────────────   ──────────────────   ────────────────────────────   ──────────────────────────────────────
-main                                     clean                clean                          myrepo
-feature/dark-mode                        -                    2 modified · 1 untracked       worktrees/myrepo/feature-dark-mode
-fix/login-bug                            3 ahead              clean                          worktrees/myrepo/fix-login-bug
-fix/auth                                 1 ahead              2 modified                     worktrees/myrepo/fix-auth
-(detached:abc1234)                       -                    1 staged                       worktrees/myrepo/some-worktree
+BRANCH                                   SYNC                       CHANGES                        PATH
+──────────────────────────────────────   ────────────────────────   ────────────────────────────   ──────────────────────────────────────
+main                                     clean                      clean                          myrepo
+feature/dark-mode                        -                          2 modified · 1 untracked       worktrees/myrepo/feature-dark-mode
+fix/login-bug                            3 ahead                    clean                          worktrees/myrepo/fix-login-bug
+fix/auth                                 1 ahead · 2 behind         2 modified                     worktrees/myrepo/fix-auth
+(detached:abc1234)                       -                          1 staged                       worktrees/myrepo/some-worktree
 ```
 
 ---

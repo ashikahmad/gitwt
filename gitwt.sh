@@ -12,7 +12,6 @@ gitwt() {
     remove)    _gitwt_remove "${@:2}" ;;
     switch|sw) _gitwt_switch "${@:2}" ;;
     list|ls)   _gitwt_list ;;
-    status)    _gitwt_status ;;
     help|*)    _gitwt_help ;;
   esac
 }
@@ -287,46 +286,6 @@ _gitwt_list() {
   local parent_of_main
   parent_of_main="$(dirname "$main_root")"
 
-  printf "%-40s %s\n" "BRANCH" "PATH"
-  printf "%-40s %s\n" "──────────────────────────────────────" "──────────────────────────────────────"
-
-  local wt_path="" branch="" head="" stale=0
-  while IFS= read -r line; do
-    case "$line" in
-      "worktree "*) wt_path="${line#worktree }" ;;
-      "HEAD "*)     head="${line#HEAD }" ;;
-      "branch "*)   branch="${line#branch }"; branch="${branch#refs/heads/}" ;;
-      "")
-        if [[ -n "$wt_path" ]]; then
-          local display="${branch:-(detached:${head:0:7})}"
-          local rel="$wt_path"
-          [[ "$wt_path" == "$parent_of_main/"* ]] && rel="${wt_path#$parent_of_main/}"
-          if [[ ! -d "$wt_path" ]]; then
-            printf "%-40s %s\n" "(stale)" "$rel"
-            stale=1
-          else
-            printf "%-40s %s\n" "$display" "$rel"
-          fi
-        fi
-        wt_path=""; branch=""; head=""
-        ;;
-    esac
-  done < <(git worktree list --porcelain)
-
-  (( stale )) && echo "" && echo "Tip: stale entries detected — run 'git worktree prune' to clean up."
-}
-
-_gitwt_status() {
-  local main_root
-  main_root="$(_gitwt_main_repo_root 2>/dev/null)"
-  if [[ -z "$main_root" ]]; then
-    echo "Error: not inside a git repo." >&2
-    return 1
-  fi
-
-  local parent_of_main
-  parent_of_main="$(dirname "$main_root")"
-
   printf "%-40s %-26s %-30s %s\n" "BRANCH" "SYNC" "CHANGES" "PATH"
   printf "%-40s %-26s %-30s %s\n" \
     "──────────────────────────────────────" \
@@ -429,11 +388,9 @@ COMMANDS
                               Flags:
                                 --branch        also delete the local branch
 
-  list                        List all worktrees as "branch  relativePath".
+  list                        Show all worktrees with branch, sync state
+                              (ahead/behind upstream), changes, and path.
                               Alias: ls
-
-  status                      Show all worktrees with sync (ahead/behind upstream)
-                              and changes (staged/modified/untracked) columns.
 
   help                        Show this message.
 

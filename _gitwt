@@ -20,9 +20,8 @@ _gitwt() {
         'switch:cd into an existing worktree'
         'sw:cd into an existing worktree (alias for switch)'
         'remove:Remove a worktree'
-        'list:List all worktrees'
-        'ls:List all worktrees (alias for list)'
-        'status:Show sync and changes state for all worktrees'
+        'list:Show all worktrees with sync and changes state'
+        'ls:Show all worktrees with sync and changes state (alias for list)'
         'help:Show help'
       )
       _describe 'command' commands
