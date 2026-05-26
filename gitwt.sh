@@ -12,6 +12,7 @@ gitwt() {
     remove)    _gitwt_remove "${@:2}" ;;
     switch|sw) _gitwt_switch "${@:2}" ;;
     list|ls)   _gitwt_list ;;
+    status)    _gitwt_status ;;
     help|*)    _gitwt_help ;;
   esac
 }
@@ -300,6 +301,80 @@ _gitwt_list() {
   '
 }
 
+_gitwt_status() {
+  local main_root
+  main_root="$(_gitwt_main_repo_root 2>/dev/null)"
+  if [[ -z "$main_root" ]]; then
+    echo "Error: not inside a git repo." >&2
+    return 1
+  fi
+
+  local parent_of_main
+  parent_of_main="$(dirname "$main_root")"
+
+  printf "%-40s %-26s %-30s %s\n" "BRANCH" "SYNC" "CHANGES" "PATH"
+  printf "%-40s %-26s %-30s %s\n" \
+    "──────────────────────────────────────" \
+    "────────────────────────" \
+    "────────────────────────────" \
+    "──────────────────────────────────────"
+
+  local wt_path="" branch="" head="" is_detached=""
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*) wt_path="${line#worktree }" ;;
+      "HEAD "*)     head="${line#HEAD }" ;;
+      "branch "*)   branch="${line#branch }"; branch="${branch#refs/heads/}" ;;
+      "detached")   is_detached=1 ;;
+      "")
+        if [[ -n "$wt_path" ]]; then
+          local display_branch="${branch:-(detached:${head:0:7})}"
+
+          local rel="$wt_path"
+          [[ "$wt_path" == "$parent_of_main/"* ]] && rel="${wt_path#$parent_of_main/}"
+
+          # SYNC — ahead/behind vs upstream (skip for detached HEAD)
+          local sync="-"
+          if [[ -z "$is_detached" && -n "$branch" ]]; then
+            local ahead="$(git -C "$wt_path" rev-list --count "@{u}..HEAD" 2>/dev/null)"
+            local behind="$(git -C "$wt_path" rev-list --count "HEAD..@{u}" 2>/dev/null)"
+            if [[ -n "$ahead" && -n "$behind" ]]; then
+              if (( ahead == 0 && behind == 0 )); then
+                sync="clean"
+              else
+                sync=""
+                (( ahead  > 0 )) && sync="${sync:+$sync · }${ahead} ahead"
+                (( behind > 0 )) && sync="${sync:+$sync · }${behind} behind"
+              fi
+            fi
+          fi
+
+          # CHANGES — staged / modified / untracked
+          local staged=0 modified=0 untracked=0
+          while IFS= read -r sline; do
+            local x="${sline:0:1}" y="${sline:1:1}"
+            if [[ "$x" == "?" && "$y" == "?" ]]; then
+              (( untracked++ ))
+            else
+              [[ "$x" != " " ]] && (( staged++ ))
+              [[ "$y" == "M" || "$y" == "D" ]] && (( modified++ ))
+            fi
+          done < <(git -C "$wt_path" status --porcelain 2>/dev/null)
+
+          local changes=""
+          (( staged    > 0 )) && changes="${changes:+$changes · }${staged} staged"
+          (( modified  > 0 )) && changes="${changes:+$changes · }${modified} modified"
+          (( untracked > 0 )) && changes="${changes:+$changes · }${untracked} untracked"
+          [[ -z "$changes" ]] && changes="clean"
+
+          printf "%-40s %-26s %-30s %s\n" "$display_branch" "$sync" "$changes" "$rel"
+        fi
+        wt_path=""; branch=""; head=""; is_detached=""
+        ;;
+    esac
+  done < <(git worktree list --porcelain)
+}
+
 _gitwt_help() {
   cat <<'EOF'
 gitwt — a friendly wrapper around git worktree
@@ -330,6 +405,9 @@ COMMANDS
 
   list                        List all worktrees as "branch  relativePath".
                               Alias: ls
+
+  status                      Show all worktrees with sync (ahead/behind upstream)
+                              and changes (staged/modified/untracked) columns.
 
   help                        Show this message.
 
