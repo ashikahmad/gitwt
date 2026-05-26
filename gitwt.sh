@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 # gitwt - A friendly git worktree CLI wrapper
-# Source this file in your .bashrc or .zshrc:
+# Source this file in your .zshrc or .bashrc:
 #   source ~/.config/gitwt/gitwt.sh
 
 gitwt() {
   local cmd="${1:-help}"
+  local GITWT_VERSION="0.1.0"
 
   case "$cmd" in
-    new)       _gitwt_new    "${@:2}" ;;
-    remove)    _gitwt_remove "${@:2}" ;;
-    switch|sw) _gitwt_switch "${@:2}" ;;
-    list|ls)   _gitwt_list ;;
-    help|*)    _gitwt_help ;;
+    new)               _gitwt_new    "${@:2}" ;;
+    remove)            _gitwt_remove "${@:2}" ;;
+    switch|sw)         _gitwt_switch "${@:2}" ;;
+    list|ls)           _gitwt_list ;;
+    version|--version|-v) echo "gitwt $GITWT_VERSION" ;;
+    help|*)            _gitwt_help ;;
   esac
 }
 
@@ -368,6 +370,9 @@ COMMANDS
                               (ahead/behind upstream), changes, and path.
                               Alias: ls
 
+  version                     Show the current gitwt version.
+                              Also: gitwt --version, gitwt -v
+
   help                        Show this message.
 
 WORKTREE PATH LAYOUT
@@ -396,10 +401,10 @@ INSTALL
        mkdir -p ~/.config/gitwt
        cp gitwt.sh ~/.config/gitwt/gitwt.sh
 
-  2. Add to your ~/.bashrc or ~/.zshrc:
+  2. Add to your ~/.zshrc or ~/.bashrc:
        source ~/.config/gitwt/gitwt.sh
 
   3. Reload your shell:
-       source ~/.bashrc   # or source ~/.zshrc
+       source ~/.zshrc   # or source ~/.bashrc
 EOF
 }

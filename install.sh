@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # install.sh — gitwt installer
 # Copies gitwt.sh and _gitwt to ~/.config/gitwt/ and adds
-# the necessary source lines to ~/.bashrc and/or ~/.zshrc.
+# the necessary source lines to ~/.zshrc and/or ~/.bashrc.
 
 set -e
 
@@ -79,8 +79,8 @@ bold "==> Done!"
 echo ""
 echo "Reload your shell to start using gitwt:"
 echo ""
-echo "  For bash:  source ~/.bashrc"
 echo "  For zsh:   source ~/.zshrc"
+echo "  For bash:  source ~/.bashrc"
 echo ""
 echo "Then try:  gitwt help"
 echo ""

@@ -31,11 +31,11 @@ bash install.sh
 Then reload your shell:
 
 ```bash
-# bash
-source ~/.bashrc
-
 # zsh
 source ~/.zshrc
+
+# bash
+source ~/.bashrc
 ```
 
 ### Manual install
@@ -48,7 +48,7 @@ cp gitwt.sh ~/.config/gitwt/gitwt.sh
 cp _gitwt   ~/.config/gitwt/_gitwt
 ```
 
-2. Add to your `~/.bashrc` or `~/.zshrc`:
+2. Add to your `~/.zshrc` or `~/.bashrc`:
 
 ```bash
 # For bash and zsh
@@ -177,7 +177,7 @@ The `install.sh` script adds the completion source line to `.zshrc` automaticall
 
 ## Pro tip: shorter alias
 
-If you find yourself typing `gitwt` a lot, you can add a shorter alias to your `~/.bashrc` or `~/.zshrc`:
+If you find yourself typing `gitwt` a lot, you can add a shorter alias to your `~/.zshrc` or `~/.bashrc`:
 
 ```bash
 alias gwt="gitwt"

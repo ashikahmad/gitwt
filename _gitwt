@@ -21,6 +21,7 @@ _gitwt() {
         'remove:Remove a worktree'
         'list:Show all worktrees with sync and changes state'
         'ls:Show all worktrees with sync and changes state (alias for list)'
+        'version:Show gitwt version'
         'help:Show help'
       )
       _describe 'command' commands
