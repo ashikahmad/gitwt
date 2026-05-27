@@ -51,5 +51,5 @@ teardown() { teardown_repo; }
 @test "list: clean worktree shows 'clean' in changes column" {
   run "$GITWT_RUNNER" list
   assert_success
-  assert_output --partial "clean"
+  assert_output --partial "✓ clean"
 }

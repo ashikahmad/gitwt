@@ -126,7 +126,7 @@ Show all worktrees with branch, sync state (ahead/behind upstream), local change
 ```
 BRANCH                                   SYNC                       CHANGES                        PATH
 ──────────────────────────────────────   ────────────────────────   ────────────────────────────   ──────────────────────────────────────
-main                                     clean                      clean                          myrepo
+main                                     ✓ clean                    ✓ clean                        myrepo
 feature/dark-mode                        -                          2 modified · 1 untracked       worktrees/myrepo/feature-dark-mode
 fix/login-bug                            3 ahead                    clean                          worktrees/myrepo/fix-login-bug
 fix/auth                                 1 ahead · 2 behind         2 modified                     worktrees/myrepo/fix-auth

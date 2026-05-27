@@ -303,7 +303,7 @@ _gitwt_list() {
             local behind="$(git -C "$wt_path" rev-list --count "HEAD..@{u}" 2>/dev/null)"
             if [[ -n "$ahead" && -n "$behind" ]]; then
               if (( ahead == 0 && behind == 0 )); then
-                sync="clean"
+                sync="✓ clean"
               else
                 sync=""
                 (( ahead  > 0 )) && sync="${sync:+$sync · }${ahead} ahead"
@@ -328,7 +328,7 @@ _gitwt_list() {
           (( staged    > 0 )) && changes="${changes:+$changes · }${staged} staged"
           (( modified  > 0 )) && changes="${changes:+$changes · }${modified} modified"
           (( untracked > 0 )) && changes="${changes:+$changes · }${untracked} untracked"
-          [[ -z "$changes" ]] && changes="clean"
+          [[ -z "$changes" ]] && changes="✓ clean"
 
           printf "%-40s %-26s %-30s %s\n" "$display_branch" "$sync" "$changes" "$rel"
         fi
