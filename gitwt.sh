@@ -85,8 +85,15 @@ _gitwt_new() {
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --fetch)  do_fetch=1 ; shift ;;
-      --from)   from_branch="$2" ; shift 2 ;;
-      --from=*) from_branch="${1#--from=}" ; shift ;;
+      --from=*) set -- --from "${1#--from=}" "${@:2}" ;;
+      --from)
+        # A bare `shift 2` fails without shifting when the value is missing, which loops forever.
+        if [[ $# -lt 2 || -z "$2" || "$2" == -* ]]; then
+          echo "Error: --from requires a base branch." >&2
+          echo "Usage: gitwt new <branch-name> [--from <base>] [--fetch]" >&2
+          return 1
+        fi
+        from_branch="$2" ; shift 2 ;;
       *)        branch="$1" ; shift ;;
     esac
   done
