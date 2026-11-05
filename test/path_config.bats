@@ -118,6 +118,68 @@ teardown() { teardown_repo; }
   assert_output --partial "already exists"
 }
 
+@test "path clash: names the branch that owns the folder, nothing created" {
+  run "$GITWT_RUNNER" new feature/a-b
+  assert_success
+  run "$GITWT_RUNNER" new feature-a/b
+  assert_failure
+  assert_output --partial "worktree path already exists"
+  assert_output --partial "belongs to branch 'feature/a-b'"
+  assert_output --partial "'feature-a/b' maps to the same folder"
+  run git show-ref --verify --quiet refs/heads/feature-a/b
+  assert_failure
+}
+
+@test "path clash: {branch} keeps those two branches apart" {
+  git config gitwt.path '../wt/{branch}'
+  run "$GITWT_RUNNER" new feature/a-b
+  assert_success
+  run "$GITWT_RUNNER" new feature-a/b
+  assert_success
+}
+
+@test "path clash: detached worktree in the folder is explained" {
+  git worktree add --detach "$TEST_WORK_DIR/worktrees/myrepo/feat" HEAD
+  run "$GITWT_RUNNER" new feat
+  assert_failure
+  assert_output --partial "detached HEAD"
+}
+
+@test "path clash: another repo in the folder is named" {
+  git config --global gitwt.path '../wt/{slug}'
+  run "$GITWT_RUNNER" new feat
+  assert_success
+
+  local other="$TEST_WORK_DIR/other"
+  git init -b main "$other"
+  git -C "$other" config user.email "test@test.com"
+  git -C "$other" config user.name "Test"
+  git -C "$other" commit --allow-empty -m "init"
+  cd "$other"
+  run "$GITWT_RUNNER" new feat
+  assert_failure
+  assert_output --partial "checkout of another repo: $TEST_REPO"
+}
+
+@test "path clash: owner is found when the configured path goes through a symlink" {
+  mkdir "$TEST_WORK_DIR/real"
+  ln -s "$TEST_WORK_DIR/real" "$TEST_WORK_DIR/link"
+  git config gitwt.path "$TEST_WORK_DIR/link/{slug}"
+  run "$GITWT_RUNNER" new feature/a-b
+  assert_success
+  run "$GITWT_RUNNER" new feature-a/b
+  assert_failure
+  assert_output --partial "belongs to branch 'feature/a-b'"
+}
+
+@test "path clash: folder that isn't a worktree says so" {
+  git config gitwt.path '../wt/{slug}'
+  mkdir -p "$TEST_WORK_DIR/wt/feat"
+  run "$GITWT_RUNNER" new feat
+  assert_failure
+  assert_output --partial "isn't a worktree of this repo"
+}
+
 @test "path config: existing branch attaches at the configured path" {
   git branch existing
   git config gitwt.path '../wt/{slug}'

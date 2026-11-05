@@ -228,13 +228,17 @@ Without `--recurse-submodules`, `test/libs/*` is empty and run_tests.sh fails wi
 - [ ] README.md:19: reword "no sibling folders", since `../worktrees` is one sibling folder; "outside your repo" is accurate
 
 ### TASK-018 | Explain worktree path collisions
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Low  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-05  
 **Tags**: #bug  
 
 `feature/a-b`, `feature-a/b`, `feature/a/b` and `feature-a-b` can coexist in git but all map to the slug `feature-a-b`. The second `gitwt new` fails with `worktree path already exists` and a `gitwt list` tip, without naming the collision or the branch that owns the path.
+
+**Notes**:
+**Result**: the error now says what is using the folder: a branch, a detached worktree, a checkout of another repo, or something that isn't a worktree. Each case gets its own tip. Done together with TASK-023, which makes these clashes easier to hit.
 
 ### TASK-019 | Fix gitwt list alignment and bare repo display
 **Status**: backlog  
@@ -290,10 +294,11 @@ Run from a clone in `~/.config/gitwt`, or with installed files symlinked to a re
 **Also noted, not in scope yet**: the installer's reinstall output shows no versions, and every version reports `0.1.0`. Source lines use an absolute home path rather than `$HOME`. There is no uninstall.
 
 ### TASK-023 | Let users configure the worktree path
-**Status**: in-progress  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-05  
 **Tags**: #feature  
 
 New worktrees always went to `../worktrees/<repo>/<slug>`. The `gitwt.path` git config now takes a template with `{repo}`, `{slug}` and `{branch}`, and the old location stays the default.
@@ -308,4 +313,12 @@ New worktrees always went to `../worktrees/<repo>/<slug>`. The `gitwt.path` git 
 **Notes**:
 **Design**: git config rather than a dotfile or env var. It needs no parser, gives repo-over-global precedence and `includeIf`, and a cloned repo can't set it, so a repo can't choose where worktrees go on someone's machine.
 
-**Related**: TASK-003 covers moving existing worktrees. TASK-018 covers explaining path collisions, which custom templates make easier to hit.
+**Result**: `gitwt new` builds the path from `gitwt.path` and rejects templates it can't use before creating anything. `switch`, `remove` and `list` needed no changes, because they read registered paths from git.
+
+**Modified files**:
+- gitwt.sh
+- README.md
+- test/path_config.bats
+- test/test_helper.bash
+
+**Related**: TASK-003 covers moving existing worktrees. TASK-018 explains path collisions, which custom templates make easier to hit.

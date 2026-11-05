@@ -178,7 +178,7 @@ The default is `../worktrees/{repo}/{slug}`. Some other layouts:
 
 - The template must include `{slug}` or `{branch}`, and other placeholders are rejected.
 - Relative paths start from the main repo root, wherever you run `gitwt` from.
-- A global template without `{repo}` puts all your repos in one folder, so same-named branches will clash. Two repos with the same folder name can clash too, even with `{repo}`. `gitwt new` stops with `worktree path already exists` rather than overwriting anything.
+- Paths can clash. `{slug}` gives `feature/a-b` and `feature-a/b` the same folder, a global template without `{repo}` puts all your repos in one folder, and two repos with the same folder name can clash even with `{repo}`. `gitwt new` stops and tells you which branch or repo is using the folder.
 - Inside the repo, a worktree shows as untracked until it's ignored. `gitwt new` prints the line to add to `.git/info/exclude`.
 - Changing the setting only affects new worktrees. Existing ones stay put, and `switch`, `remove` and `list` still find them.
 

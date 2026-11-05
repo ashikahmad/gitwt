@@ -106,6 +106,57 @@ _gitwt_note_if_untracked_in_repo() {
   echo "To hide it on this machine, run in the main repo: echo '${rel%%/*}/' >> .git/info/exclude" >&2
 }
 
+# Prints the branch checked out at a registered worktree path (empty if detached).
+# Returns 1 if this repo has no worktree at that path.
+_gitwt_worktree_owner() {
+  local target="$1" line wt=""
+
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*) wt="${line#worktree }" ;;
+      "branch "*)   [[ "$wt" == "$target" ]] && { echo "${line#branch refs/heads/}"; return 0; } ;;
+      "detached")   [[ "$wt" == "$target" ]] && return 0 ;;
+    esac
+  done < <(git worktree list --porcelain)
+
+  return 1
+}
+
+# Says what already occupies the path a new worktree needs
+_gitwt_explain_existing_path() {
+  local branch="$1" worktree_path="$2"
+
+  echo "Error: worktree path already exists: $worktree_path" >&2
+
+  # git records physical paths, and the configured path may go through a symlink
+  local physical owner
+  physical="$(cd "$worktree_path" && pwd -P)"
+
+  if owner="$(_gitwt_worktree_owner "$physical")"; then
+    if [[ -n "$owner" ]]; then
+      echo "It belongs to branch '$owner', and '$branch' maps to the same folder." >&2
+      echo "Tip: rename one of the branches, or keep slashes in folder names by using {branch} in gitwt.path." >&2
+    else
+      echo "It's a worktree with a detached HEAD, and '$branch' maps to the same folder." >&2
+      echo "Tip: remove it with 'git worktree remove $worktree_path', or rename '$branch'." >&2
+    fi
+    return 0
+  fi
+
+  if [[ -e "$worktree_path/.git" ]]; then
+    local other_repo
+    other_repo="$(cd "$worktree_path" && _gitwt_main_repo_root)"
+    if [[ -n "$other_repo" ]]; then
+      echo "It's a checkout of another repo: $other_repo" >&2
+      echo "Tip: repos with the same folder name, or a gitwt.path without {repo}, map to the same place. Set a different gitwt.path in one of them." >&2
+      return 0
+    fi
+  fi
+
+  echo "It isn't a worktree of this repo." >&2
+  echo "Tip: move it out of the way, or run 'gitwt list' to see all registered worktrees." >&2
+}
+
 # Used by `switch` and `remove` — looks up the actual registered path by branch name
 _gitwt_find_path() {
   local branch="$1"
@@ -165,8 +216,7 @@ _gitwt_new() {
   worktree_path="$(_gitwt_generate_path "$branch")" || return 1
 
   if [[ -d "$worktree_path" ]]; then
-    echo "Error: worktree path already exists: $worktree_path" >&2
-    echo "Tip: run 'gitwt list' to see all registered worktrees." >&2
+    _gitwt_explain_existing_path "$branch" "$worktree_path"
     return 1
   fi
 
