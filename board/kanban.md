@@ -80,25 +80,33 @@ gitwt has no move or rename command. `git branch -m` works and `gitwt sw` still 
 - [ ] Add tests, zsh completion and docs
 
 ### TASK-004 | Automate new worktree setup with .worktreeinclude and a post-create hook
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-05  
 **Tags**: #feature  
 
 gitwt has no setup step, so ignored files and project setup must be redone by hand in every new worktree. Git's `post-checkout` hook does fire on `gitwt new`, but it also fires on ordinary checkouts, and hooks in `.git/hooks` are not versioned or shared. Similar tools combine a list of ignored files to copy with post-create commands; `.worktreeinclude` is used by Claude Code, wt-cli and PostHog Code.
 
 **Subtasks**:
-- [ ] Put reading `.worktreeinclude` in a helper that TASK-001 can reuse
-- [ ] Copy files listed in `.worktreeinclude` (gitignore syntax) into new worktrees
-- [ ] Run an optional post-create script from the repo
-- [ ] Require approval or opt-in before running a repo-supplied script
-- [ ] Add tests and docs
+- [x] Put reading `.worktreeinclude` in a helper that TASK-001 can reuse
+- [x] Copy files listed in `.worktreeinclude` (gitignore syntax) into new worktrees
+- [x] Run an optional post-create script from the repo
+- [x] Require approval or opt-in before running a repo-supplied script
+- [x] Add tests and docs
 
 **Notes**:
+**Result**: `gitwt new` copies ignored files listed in the main repo's `.worktreeinclude` into the new worktree without overwriting anything, then runs `.gitwt/post-create` inside it. The script runs only once that exact version is approved; the approval is stored as a hash in `gitwt.postCreateApproved` in the repo's local git config. Without a terminal, an unapproved script is skipped with a note. A failing script gives a warning, keeps the worktree, still moves you into it, and returns 1. Added 13 tests; full suite 42/42 under bash 3.2, and 47/47 combined with the TASK-005 fix. Copying and the approval prompt were also run by hand under zsh and bash.
+
+**Modified files**:
+- gitwt.sh
+- README.md
+- test/setup.bats
+
 **Plan**: separate work that comes first, followed by TASK-001. The removal check itself belongs to TASK-001, not this task.
 
-**Shared with TASK-001**: the code that reads `.worktreeinclude` should be one helper, because TASK-001 uses the same list to decide which ignored files to protect on removal. Files copied in by this task are the ones it compares with the main repo's copy, so keep the copy step predictable.
+**Shared with TASK-001**: the code that reads `.worktreeinclude` is one helper, `_gitwt_included_files <dir>`, because TASK-001 uses the same list to decide which ignored files to protect on removal. Files copied in by this task are the ones it compares with the main repo's copy, so keep the copy step predictable.
 
 ### TASK-005 | Fix infinite loop when --from has no value
 **Status**: backlog  

@@ -77,6 +77,84 @@ _gitwt_find_path() {
   echo "$found"
 }
 
+# Prints the files in <dir> that its .worktreeinclude lists and git ignores, NUL-separated.
+_gitwt_included_files() {
+  local dir="$1"
+  [[ -f "$dir/.worktreeinclude" ]] || return 0
+  git -C "$dir" ls-files -z --others --ignored --exclude-from=.worktreeinclude 2>/dev/null \
+    | git -C "$dir" check-ignore -z --stdin 2>/dev/null
+  return 0
+}
+
+# Copies the included files from <source> to <dest>. Anything already at <dest> is left alone.
+_gitwt_copy_included() {
+  local source_dir="$1" dest_dir="$2" file copied=0 skipped=0 failed=0
+
+  while IFS= read -r -d '' file; do
+    if [[ -e "$dest_dir/$file" || -L "$dest_dir/$file" ]]; then
+      skipped=$((skipped + 1))
+    elif mkdir -p "$(dirname "$dest_dir/$file")" && cp -Pp "$source_dir/$file" "$dest_dir/$file"; then
+      copied=$((copied + 1))
+    else
+      echo "Warning: could not copy '$file'." >&2
+      failed=$((failed + 1))
+    fi
+  done < <(_gitwt_included_files "$source_dir")
+
+  (( copied > 0 ))  && echo "Copied $copied file(s) listed in .worktreeinclude."
+  (( skipped > 0 )) && echo "Skipped $skipped listed file(s) already there."
+  return 0
+}
+
+# Runs <worktree>/.gitwt/post-create. The script comes from the repo, so it only runs once this
+# exact version is approved; the approval is stored as its hash in the repo's local git config.
+# Returns non-zero only if the script ran and failed.
+_gitwt_run_post_create() {
+  local worktree="$1" branch="$2" main_root="$3"
+  local script="$worktree/.gitwt/post-create"
+  [[ -f "$script" ]] || return 0
+
+  if [[ ! -x "$script" ]]; then
+    echo "Note: .gitwt/post-create is not executable, skipping it." >&2
+    return 0
+  fi
+
+  local script_hash answer
+  script_hash="$(git -C "$worktree" hash-object --no-filters "$script")"
+  if [[ "$(git -C "$worktree" config --get gitwt.postCreateApproved)" != "$script_hash" ]]; then
+    if [[ ! -t 0 ]]; then
+      echo "Note: .gitwt/post-create is not approved, skipping it. Run 'gitwt new' from a terminal to approve it." >&2
+      return 0
+    fi
+    printf "This repo has a setup script that hasn't been approved: %s\n" "$script"
+    printf "Review it first if you're unsure. Run it now and whenever it's unchanged? [y/N] "
+    read -r answer
+    case "$answer" in
+      y|Y|yes) git -C "$worktree" config --local gitwt.postCreateApproved "$script_hash" ;;
+      *)       echo "Skipped .gitwt/post-create."; return 0 ;;
+    esac
+  fi
+
+  echo "Running .gitwt/post-create..."
+  if ! ( cd "$worktree" && GITWT_BRANCH="$branch" GITWT_WORKTREE="$worktree" GITWT_MAIN_ROOT="$main_root" "$script" ); then
+    echo "Warning: .gitwt/post-create failed. The worktree was still created." >&2
+    return 1
+  fi
+}
+
+# Sets up a worktree that was just added, then cd's into it. Runs from the caller's directory.
+_gitwt_finish_new() {
+  local worktree="$1" branch="$2" main_root setup_status=0
+  main_root="$(_gitwt_main_repo_root)"
+
+  _gitwt_copy_included "$main_root" "$worktree"
+  _gitwt_run_post_create "$worktree" "$branch" "$main_root" || setup_status=1
+
+  echo "Done! Switching into it now..."
+  cd "$worktree" || return 1
+  return $setup_status
+}
+
 # ── subcommands ────────────────────────────────────────────────────────────────
 
 _gitwt_new() {
@@ -118,13 +196,9 @@ _gitwt_new() {
       echo "Note: --from and --fetch are ignored when the branch already exists." >&2
     fi
     echo "Branch '$branch' exists — creating worktree at: $worktree_path"
-    if git worktree add "$worktree_path" "$branch"; then
-      echo "Done! Switching into it now..."
-      cd "$worktree_path" || return 1
-    else
-      return 1
-    fi
-    return 0
+    git worktree add "$worktree_path" "$branch" || return 1
+    _gitwt_finish_new "$worktree_path" "$branch"
+    return $?
   fi
 
   # Branch does not exist — create it from a base branch
@@ -186,12 +260,8 @@ _gitwt_new() {
   fi
 
   echo "Creating '$branch' from '$base_branch' at: $worktree_path"
-  if git worktree add -b "$branch" "$worktree_path" "$base_branch"; then
-    echo "Done! Switching into it now..."
-    cd "$worktree_path" || return 1
-  else
-    return 1
-  fi
+  git worktree add -b "$branch" "$worktree_path" "$base_branch" || return 1
+  _gitwt_finish_new "$worktree_path" "$branch"
 }
 
 _gitwt_switch() {
@@ -377,6 +447,13 @@ COMMANDS
                               Also: gitwt --version, gitwt -v
 
   help                        Show this message.
+
+NEW WORKTREE SETUP
+  .worktreeinclude            Ignored files in the main repo that match this file
+                              (gitignore syntax) are copied into each new worktree.
+  .gitwt/post-create          Executable script run inside each new worktree, once
+                              you've approved that version of it. Gets GITWT_BRANCH,
+                              GITWT_WORKTREE and GITWT_MAIN_ROOT.
 
 WORKTREE PATH LAYOUT
   New worktrees are placed at:

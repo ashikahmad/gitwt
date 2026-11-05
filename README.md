@@ -29,6 +29,7 @@ With raw git you'd need to `git checkout develop && git pull && git checkout -b 
 - **`switch` / `sw`** — jump into any worktree by branch name
 - **`remove`** — tear down a worktree; auto-returns you to the main repo if you're inside it
 - **`list` / `ls`** — clean table of all worktrees with branch and relative path
+- **New worktree setup** — copy ignored files such as `.env` and run a setup script automatically
 - **Zsh tab-completion** via the included `_gitwt` completion script
 
 ---
@@ -175,6 +176,37 @@ gitwt sw feature/dark-mode
 # Remove when done
 gitwt remove feature/dark-mode
 ```
+
+---
+
+## New worktree setup
+
+New worktrees start without your ignored files and project setup. `gitwt new` can handle both, whether it creates a branch or attaches an existing one.
+
+### Copy ignored files: `.worktreeinclude`
+
+List the files to bring along in a `.worktreeinclude` at the root of the main repo, using gitignore syntax:
+
+```gitignore
+.env
+.env.local
+config/secrets.json
+```
+
+Files are copied from the main repo, even when you run `gitwt new` inside another worktree. A file is copied only if it matches this list **and** git ignores it, and anything already in the new worktree is left alone.
+
+### Run a setup script: `.gitwt/post-create`
+
+Commit an executable script at `.gitwt/post-create`, for example to install dependencies:
+
+```sh
+#!/bin/sh
+npm install
+```
+
+It runs inside the new worktree, after files are copied, with `GITWT_BRANCH`, `GITWT_WORKTREE` and `GITWT_MAIN_ROOT` set.
+
+Because the script comes from the repo, gitwt asks before running it. Your approval covers that exact version and is stored in the repo's local git config, so a changed script asks again. Without a terminal, an unapproved script is skipped with a note. If the script fails, you get a warning and the worktree is kept, you're still moved into it, and `gitwt new` returns 1.
 
 ---
 
