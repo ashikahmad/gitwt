@@ -25,14 +25,31 @@
 **Category**: CLI  
 **Created**: 2026-11-05  
 **Tags**: #bug #feature  
+**Blocked by**: TASK-004  
 
 `gitwt remove` relies on `git worktree remove` (gitwt.sh:243), which refuses modified, staged and untracked files but deletes ignored files without warning. A test worktree with an ignored `.env` was removed with exit 0 and the file was gone for good. gitwt also has no `--force` flag of its own, so forcing means dropping to raw git.
 
 **Subtasks**:
-- [ ] List ignored files before removing and warn or ask for confirmation
+- [ ] Read `.worktreeinclude` from the worktree being removed, using the helper built in TASK-004
+- [ ] Compare listed ignored files with the main repo's copy
+- [ ] Refuse removal when a listed file differs from main, and suggest backing it up before using `--force`
+- [ ] When a listed file is not in main, offer to copy it there, first checking it is ignored on main with `git check-ignore`
+- [ ] If the copy is declined or the file is not ignored on main, refuse removal
+- [ ] Mention unlisted ignored paths in one line
+- [ ] Without a `.worktreeinclude`, ask once before deleting any ignored files and suggest adding one
+- [ ] With no terminal, refuse wherever a prompt would appear, unless `--force` is given
 - [ ] Add `gitwt remove --force`
-- [ ] Add tests for ignored files and `--force`
+- [ ] Add tests for each case above
 - [ ] Document what removal does and does not protect
+
+**Notes**:
+**Design**: `.worktreeinclude` already says which ignored files matter, so it can answer what to bring into a new worktree and what to check before deleting one. Being listed does not make a file at risk: an unchanged copy loses nothing because main still has it. A listed file that matches main stays quiet. A listed file that differs from main makes removal refuse, with a suggestion to back it up before using `--force` if needed; gitwt does not offer a backup. A listed file that is not in main gets an offer to copy it there, only if `git check-ignore` confirms it is ignored on main, so a secret cannot become committable. gitwt compares only against main, not other worktrees. Unlisted paths such as `node_modules/` get a one-line mention, so there is no prompt on every removal and no separate "safe to delete" list.
+
+**Open question**: should unlisted ignored files also block removal? Proposed answer is no, because blocking on everything brings the noise back. The cost is that an unlisted `local.db` is deleted after only a one-line notice. Not yet decided.
+
+**Tried**: in a scratch repo, `git ls-files --others --ignored --exclude-from=.worktreeinclude` listed `.env`, `.env.local` and `config/secrets.json` and left out `node_modules/` and `local.db`, and `cmp` against main's copy sorted them correctly. It also lists untracked files that are not ignored, which is harmless because git already refuses to remove a worktree containing those. None of this is in gitwt yet.
+
+**Plan**: two separate pieces of work. TASK-004 is done first, then this task, which reuses its `.worktreeinclude` helper. The data-loss risk stays until this task is done.
 
 ### TASK-002 | Make the failed-removal tip accurate about --force
 **Status**: backlog  
@@ -72,10 +89,16 @@ gitwt has no move or rename command. `git branch -m` works and `gitwt sw` still 
 gitwt has no setup step, so ignored files and project setup must be redone by hand in every new worktree. Git's `post-checkout` hook does fire on `gitwt new`, but it also fires on ordinary checkouts, and hooks in `.git/hooks` are not versioned or shared. Similar tools combine a list of ignored files to copy with post-create commands; `.worktreeinclude` is used by Claude Code, wt-cli and PostHog Code.
 
 **Subtasks**:
+- [ ] Put reading `.worktreeinclude` in a helper that TASK-001 can reuse
 - [ ] Copy files listed in `.worktreeinclude` (gitignore syntax) into new worktrees
 - [ ] Run an optional post-create script from the repo
 - [ ] Require approval or opt-in before running a repo-supplied script
 - [ ] Add tests and docs
+
+**Notes**:
+**Plan**: separate work that comes first, followed by TASK-001. The removal check itself belongs to TASK-001, not this task.
+
+**Shared with TASK-001**: the code that reads `.worktreeinclude` should be one helper, because TASK-001 uses the same list to decide which ignored files to protect on removal. Files copied in by this task are the ones it compares with the main repo's copy, so keep the copy step predictable.
 
 ### TASK-005 | Fix infinite loop when --from has no value
 **Status**: backlog  
