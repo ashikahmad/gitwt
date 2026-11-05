@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 22 -->
+<!-- Config: Last Task ID: 23 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -288,3 +288,24 @@ Run from a clone in `~/.config/gitwt`, or with installed files symlinked to a re
 **Related**: TASK-008 covers a home with no shell config files. TASK-014 covers the `compdef` error from the source line.
 
 **Also noted, not in scope yet**: the installer's reinstall output shows no versions, and every version reports `0.1.0`. Source lines use an absolute home path rather than `$HOME`. There is no uninstall.
+
+### TASK-023 | Let users configure the worktree path
+**Status**: in-progress  
+**Priority**: Medium  
+**Category**: CLI  
+**Created**: 2026-11-05  
+**Tags**: #feature  
+
+New worktrees always went to `../worktrees/<repo>/<slug>`. The `gitwt.path` git config now takes a template with `{repo}`, `{slug}` and `{branch}`, and the old location stays the default.
+
+**Subtasks**:
+- [x] Resolve the template in `_gitwt_generate_path`
+- [x] Reject templates with no `{slug}` or `{branch}`, and unknown placeholders
+- [x] Note when a worktree inside the repo isn't ignored
+- [x] Keep the developer's own git config out of the tests
+- [x] Add tests and update the README and `gitwt help`
+
+**Notes**:
+**Design**: git config rather than a dotfile or env var. It needs no parser, gives repo-over-global precedence and `includeIf`, and a cloned repo can't set it, so a repo can't choose where worktrees go on someone's machine.
+
+**Related**: TASK-003 covers moving existing worktrees. TASK-018 covers explaining path collisions, which custom templates make easier to hit.

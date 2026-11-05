@@ -16,7 +16,7 @@ Instead of remembering long `git worktree` paths and flags, `gitwt` gives you si
 With plain `git worktree`, you manage paths. With `gitwt`, you name a branch — `gitwt sw feature/dark-mode` — and it finds the right directory for you. No memorising where you put things.
 
 **2. Worktrees live outside your repo, automatically.**<br/>
-Every worktree lands at `../worktrees/<repo>/<branch-slug>` — a predictable location next to your main repo. Your repo's own directory stays clean (no sibling folders cluttering the tree), and all worktrees for a project are grouped in one place.
+By default, every worktree lands at `../worktrees/<repo>/<branch-slug>` — a predictable location next to your main repo. Your repo's own directory stays clean (no sibling folders cluttering the tree), and all worktrees for a project are grouped in one place. Prefer somewhere else? [Set your own layout](#custom-worktree-paths).
 
 **3. Branch and worktree in a single command, without switching first.**<br/>
 With raw git you'd need to `git checkout develop && git pull && git checkout -b my-feature` before creating a worktree. `gitwt new my-feature --from develop --fetch` does it all in one shot from wherever you are — no need to leave your current branch.
@@ -137,7 +137,7 @@ fix/auth                                 1 ahead · 2 behind         2 modified 
 
 ## Worktree path layout
 
-Worktrees are placed at a predictable location relative to your main repo:
+By default, worktrees are placed at a predictable location relative to your main repo:
 
 ```
 ../worktrees/<repoName>/<type>-<rest-of-branch-name>
@@ -150,6 +150,37 @@ Examples:
 | `feature/dark-mode` | `../worktrees/myrepo/feature-dark-mode` |
 | `fix/checkin-timeout` | `../worktrees/myrepo/fix-checkin-timeout` |
 | `hotfix` | `../worktrees/myrepo/hotfix` |
+
+### Custom worktree paths
+
+Set the `gitwt.path` git config to a template. It works like any git setting: a repo's value overrides the global one, and `includeIf` can set it per directory.
+
+```bash
+git config --global gitwt.path '~/worktrees/{repo}/{slug}'   # all repos
+git config gitwt.path '.worktrees/{slug}'                    # this repo only
+git config --global --unset gitwt.path                       # back to the default
+```
+
+| Placeholder | Value for `feature/dark-mode` in `myrepo` |
+|---|---|
+| `{repo}` | `myrepo` |
+| `{slug}` | `feature-dark-mode` |
+| `{branch}` | `feature/dark-mode` (creates nested folders) |
+
+The default is `../worktrees/{repo}/{slug}`. Some other layouts:
+
+| `gitwt.path` | Worktree path |
+|---|---|
+| `../{repo}-worktrees/{slug}` | `../myrepo-worktrees/feature-dark-mode` |
+| `../{repo}-{slug}` | `../myrepo-feature-dark-mode` |
+| `~/worktrees/{repo}/{branch}` | `~/worktrees/myrepo/feature/dark-mode` |
+| `.worktrees/{slug}` | `.worktrees/feature-dark-mode`, inside the repo |
+
+- The template must include `{slug}` or `{branch}`, and other placeholders are rejected.
+- Relative paths start from the main repo root, wherever you run `gitwt` from.
+- A global template without `{repo}` puts all your repos in one folder, so same-named branches will clash. Two repos with the same folder name can clash too, even with `{repo}`. `gitwt new` stops with `worktree path already exists` rather than overwriting anything.
+- Inside the repo, a worktree shows as untracked until it's ignored. `gitwt new` prints the line to add to `.git/info/exclude`.
+- Changing the setting only affects new worktrees. Existing ones stay put, and `switch`, `remove` and `list` still find them.
 
 ---
 
