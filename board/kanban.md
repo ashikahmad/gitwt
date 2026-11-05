@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 21 -->
+<!-- Config: Last Task ID: 22 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -262,3 +262,29 @@ Under bash 3.2, printf pads by bytes, so `✓`, `·` and `─` misalign rows (PA
 **Tags**: #bug  
 
 The check at gitwt.sh:33 never fires because the pipeline's status is awk's. Outside a repo, git's `not a git repository` prints first, then gitwt adds a misleading line: `could not determine current branch (are you in detached HEAD state?)`, or `base branch 'x' does not exist locally` with `--from x`. `gitwt list` already handles this correctly.
+
+### TASK-022 | Make install.sh handle earlier installs correctly
+**Status**: backlog  
+**Priority**: Medium  
+**Category**: Install  
+**Created**: 2026-11-05  
+**Tags**: #bug  
+
+Reinstalling over the installer's own earlier install works: files are updated and no lines are duplicated. Other kinds of earlier install go wrong. Tested in throwaway home directories.
+
+Run from a clone in `~/.config/gitwt`, or with installed files symlinked to a repo, `cp` fails with `are identical (not copied)`. `set -e` then stops the script at install.sh:50 with exit 1, before any shell config lines are added. Read-only installed files stop it at the same point with `Permission denied`.
+
+`append_if_missing` searches for one exact line (install.sh:28). `source "$HOME/.config/gitwt/gitwt.sh"` and `source ~/.config/gitwt/gitwt.sh`, the forms the README and `gitwt help` tell people to use, are not recognised, so a second set of source lines is added and gitwt loads twice. A commented-out line is treated as installed, so gitwt stays disabled while the installer reports `Already present` and `Done!`.
+
+**Subtasks**:
+- [ ] Skip the copy when source and destination are the same file
+- [ ] Still wire up shell config when the copy is skipped
+- [ ] Recognise any active line that sources gitwt, whatever form its path takes
+- [ ] Ignore commented-out lines when checking
+- [ ] Report clearly what was updated, added or left alone
+- [ ] Add tests for these reinstall cases
+
+**Notes**:
+**Related**: TASK-008 covers a home with no shell config files. TASK-014 covers the `compdef` error from the source line.
+
+**Also noted, not in scope yet**: the installer's reinstall output shows no versions, and every version reports `0.1.0`. Source lines use an absolute home path rather than `$HOME`. There is no uninstall.
