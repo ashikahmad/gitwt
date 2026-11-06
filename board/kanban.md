@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 24 -->
+<!-- Config: Last Task ID: 32 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -13,7 +13,7 @@
 
 **Priorities**: 🔴 Critical | 🟠 High | 🟡 Medium | 🟢 Low
 
-**Tags**: #bug #feature #refactor #docs #test
+**Tags**: #bug #feature #refactor #docs #test #history
 
 ---
 
@@ -246,11 +246,12 @@ Without `--recurse-submodules`, `test/libs/*` is empty and run_tests.sh fails wi
 - [ ] README.md:19: reword "no sibling folders", since `../worktrees` is one sibling folder; "outside your repo" is accurate
 
 ### TASK-018 | Explain worktree path collisions
-**Status**: in-review  
+**Status**: done  
 **Priority**: Low  
 **Category**: CLI  
 **Created**: 2026-11-05  
 **Started**: 2026-11-05  
+**Finished**: 2026-11-06  
 **Tags**: #bug  
 
 `feature/a-b`, `feature-a/b`, `feature/a/b` and `feature-a-b` can coexist in git but all map to the slug `feature-a-b`. The second `gitwt new` fails with `worktree path already exists` and a `gitwt list` tip, without naming the collision or the branch that owns the path.
@@ -317,11 +318,12 @@ Run from a clone in `~/.config/gitwt`, or with installed files symlinked to a re
 **Also noted, not in scope yet**: the installer's reinstall output shows no versions, and every version reports `0.1.0`. Source lines use an absolute home path rather than `$HOME`. There is no uninstall.
 
 ### TASK-023 | Let users configure the worktree path
-**Status**: in-review  
+**Status**: done  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
 **Started**: 2026-11-05  
+**Finished**: 2026-11-06  
 **Tags**: #feature  
 
 New worktrees always went to `../worktrees/<repo>/<slug>`. The `gitwt.path` git config now takes a template with `{repo}`, `{slug}` and `{branch}`, and the old location stays the default.
