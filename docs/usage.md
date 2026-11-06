@@ -21,6 +21,8 @@ gitwt is a shell function, so it has to be sourced into your shell rather than r
 
 **Requirements:** git 2.18 or newer, and zsh or bash.
 
+**Tested with** zsh 5.9 and bash 5.2. bash 3.2, the version macOS ships as `/bin/bash`, isn't tested or officially supported: gitwt may work there, but changes aren't checked against it. On macOS, the default shell is zsh, which is supported.
+
 **With the installer:**
 
 ```bash
@@ -432,6 +434,8 @@ Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command
 ---
 
 ## Known limitations
+
+**bash 3.2 isn't tested or officially supported.** That's the version macOS ships as `/bin/bash`. zsh 5.9 and bash 5.2 are tested.
 
 These are tracked on the [project board](https://ashikahmad.github.io/Kanban.md/app/?board=https://github.com/ashikahmad/gitwt/blob/dev/board/kanban.md):
 

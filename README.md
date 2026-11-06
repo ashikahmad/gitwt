@@ -44,7 +44,7 @@ bash install.sh
 source ~/.zshrc    # or: source ~/.bashrc
 ```
 
-Requires git 2.18+ and zsh or bash. To install by hand or update, see [Install](docs/usage.md#install).
+Requires git 2.18+ and zsh or bash. Tested with zsh 5.9 and bash 5.2; bash 3.2, the version macOS ships, isn't tested or officially supported. To install by hand or update, see [Install](docs/usage.md#install).
 
 ---
 

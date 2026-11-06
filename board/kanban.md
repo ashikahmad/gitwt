@@ -253,6 +253,9 @@ Without compinit, sourcing `_gitwt` fails with `command not found: compdef` (_gi
 
 The suite runs only under bash (test/run_gitwt.sh), although zsh is the primary shell. No test mentions zsh or `--fetch`, and the repo has no CI config. A manual zsh smoke test of new, sw, list and remove found no zsh-only breakage, but nothing guards that. All 29 existing tests pass with submodules initialised.
 
+**Notes**:
+**Decision** (2026-11-06): bash 3.2, the version macOS ships as `/bin/bash`, isn't tested or officially supported. Supported and tested: zsh 5.9 and bash 5.2. The README and usage guide say so. The suite was run under bash 3.2 by hand up to the first versions of #2 and #3; changes since then weren't.
+
 ### TASK-016 | Make the test suite easy to run from a fresh clone
 **Status**: backlog  
 **Priority**: Medium  
