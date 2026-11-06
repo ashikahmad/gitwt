@@ -369,7 +369,7 @@ check_bash_version() {
   v="$("$SHELL" -c 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"' 2>/dev/null </dev/null || true)"
   if [[ "$v" =~ ^[0-9]+\.[0-9]+$ ]] && (( ${v%%.*} < 4 )); then
     yellow "Warning: your shell is bash $v, which gitwt doesn't support: it needs zsh, or bash 4"
-    yellow "or newer. In bash $v, gitwt ls fails and other commands are untested. Either:"
+    yellow "or newer. In bash $v, gitwt stops with this message instead of running. Either:"
     yellow "  - switch to zsh, macOS's default shell since 10.15:  chsh -s /bin/zsh"
     yellow "    (then run this installer again, so ~/.zshrc loads gitwt), or"
     yellow "  - install a newer bash, e.g. brew install bash, and make it your shell."

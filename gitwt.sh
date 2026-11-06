@@ -7,6 +7,16 @@ gitwt() {
   local cmd="${1:-help}"
   local GITWT_VERSION="0.2.0"
 
+  # gitwt needs zsh or bash 4+. In bash 3.2 (macOS's /bin/bash), parts of it fail with
+  # cryptic errors or show wrong values, so stop every command here with a clear message.
+  if [[ -n "${BASH_VERSION:-}" ]] && (( BASH_VERSINFO[0] < 4 )); then
+    echo "gitwt needs zsh, or bash 4 or newer. This is bash $BASH_VERSION, which isn't supported." >&2
+    echo "macOS's own bash is 3.2: switch to zsh, macOS's default shell (chsh -s /bin/zsh)," >&2
+    echo "or install a newer bash (brew install bash)." >&2
+    echo "See: https://github.com/ashikahmad/gitwt/blob/main/docs/usage.md#whats-supported" >&2
+    return 1
+  fi
+
   case "$cmd" in
     new)               _gitwt_new    "${@:2}" ;;
     remove)            _gitwt_remove "${@:2}" ;;
