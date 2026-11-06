@@ -35,8 +35,8 @@ _gitwt() {
         switch|sw) _gitwt_complete_worktree_branches ;;
         remove)    _gitwt_complete_remove ;;
         move|mv)
-          if (( CURRENT == 3 )); then _gitwt_complete_worktree_branches
-          else _files -/
+          if (( CURRENT == 3 )); then _gitwt_complete_movable_branches
+          elif (( CURRENT == 4 )); then _files -/
           fi ;;
       esac
       ;;
@@ -74,6 +74,14 @@ _gitwt_complete_new() {
   [[ "$used" != *"--from"* ]] && flags+=(--from)
   [[ "$used" != *"--fetch"* ]] && flags+=(--fetch)
   [[ ${#flags[@]} -gt 0 ]] && compadd -a flags
+}
+
+# `move` — branches with a worktree, except the main repo's, which can't be moved
+_gitwt_complete_movable_branches() {
+  local -a branches
+  branches=("${(@f)$(git worktree list --porcelain 2>/dev/null \
+    | awk '/^worktree / { n++ } n > 1 && /^branch / { sub(/^refs\/heads\//, "", $2); print $2 }')}")
+  compadd -a branches
 }
 
 # `switch` — complete from branches that have a live worktree

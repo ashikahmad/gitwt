@@ -207,6 +207,8 @@ registered_path() {
   run "$GITWT_RUNNER" move feat "$dest/feat"
   assert_failure 1
   assert_output --partial "different drive"
+  assert_output --partial "git worktree add '$dest/feat' feat"
+  refute_output --partial "gitwt new"
   assert [ ! -e "$dest" ]
   assert_equal "$(registered_path feat)" "$W/feat"
 }
@@ -223,4 +225,75 @@ registered_path() {
   assert_failure 1
   assert_output --partial "contains submodules"
   assert_equal "$(registered_path feat)" "$W/feat"
+}
+
+# ── review fixes ───────────────────────────────────────────────────────────────
+
+@test "move: a failed mkdir removes the folders it already made" {
+  git worktree add -q -b feat "$W/feat" HEAD
+  local long; long="$(printf 'a%.0s' {1..300})"
+
+  run "$GITWT_RUNNER" move feat "$TEST_WORK_DIR/newA/$long/x"
+  assert_failure
+  assert [ ! -e "$TEST_WORK_DIR/newA" ]
+  assert_equal "$(registered_path feat)" "$W/feat"
+}
+
+@test "move: a worktree path with a backslash is found, not reported as already there" {
+  git worktree add -q -b bs "$W/a\\tb" HEAD
+
+  run "$GITWT_RUNNER" move bs "$TEST_WORK_DIR/bsm"
+  assert_success
+  refute_output --partial "already at"
+  assert_equal "$(registered_path bs)" "$TEST_WORK_DIR/bsm"
+}
+
+@test "move: a locked worktree with a backslash in its path is still detected" {
+  git worktree add -q -b bs "$W/a\\tb" HEAD
+  git worktree lock "$W/a\\tb"
+
+  run "$GITWT_RUNNER" move bs "$TEST_WORK_DIR/bsm"
+  assert_failure 1
+  assert_output --partial "is locked"
+  refute_output --partial "Moving"
+}
+
+@test "move: into itself through a symlink is refused by gitwt" {
+  git worktree add -q -b feat "$W/feat" HEAD
+  ln -s "$W/feat" "$TEST_WORK_DIR/lnk"
+
+  run "$GITWT_RUNNER" move feat "$TEST_WORK_DIR/lnk/newsub/x"
+  assert_failure 1
+  assert_output --partial "into itself"
+  refute_output --partial "Moving"
+  assert [ ! -e "$W/feat/newsub" ]
+}
+
+@test "move: a symlink to a folder is the destination itself, not 'into it'" {
+  git worktree add -q -b feat "$W/feat" HEAD
+  mkdir "$TEST_WORK_DIR/arch"
+  ln -s "$TEST_WORK_DIR/arch" "$TEST_WORK_DIR/alink"
+
+  run "$GITWT_RUNNER" move feat "$TEST_WORK_DIR/alink"
+  assert_failure 1
+  assert_output --partial "destination already exists"
+}
+
+@test "move: the current location written out is 'already at'" {
+  git worktree add -q -b feat "$W/feat" HEAD
+
+  run "$GITWT_RUNNER" move feat "$W/feat"
+  assert_success
+  assert_output --partial "already at"
+  refute_output --partial "into itself"
+}
+
+@test "move: a file where a folder should be gets a clear error" {
+  git worktree add -q -b feat "$W/feat" HEAD
+  touch "$TEST_WORK_DIR/afile"
+
+  run "$GITWT_RUNNER" move feat "$TEST_WORK_DIR/afile/sub/x"
+  assert_failure 1
+  assert_output --partial "afile is a file"
+  refute_output --partial "Moving"
 }

@@ -106,7 +106,7 @@ restarting: virtualenvs, build caches, absolute symlinks, or programs still runn
 
 The usage guide explains it in more detail.
 
-**Result**: `gitwt move <branch> [<new-path>]` (alias `mv`). Without a path it moves the worktree to where `gitwt.path` puts the branch, so `git branch -m` followed by `gitwt move <new-name>` keeps the folder in step. A given path that's an existing folder or ends in `/` means "into it", like `mv`. Missing parent folders are created, and removed again if the move fails. If you're inside, you move with it to the same subfolder. Refused up front with nothing changed: the main repo, an existing destination (naming the branch or repo that has it, for the default path), a destination inside the worktree, a locked worktree (with the unlock command), and another drive. Submodules get git's refusal plus a tip. The generic note prints after every move. No `--force`: a lock is deliberate, so unlocking explicitly is clearer than overriding it. Added 20 tests; full suite 121/121 on bash 5.2, and renaming plus moving from inside were run by hand under zsh, along with completion.
+**Result**: `gitwt move <branch> [<new-path>]` (alias `mv`). Without a path it moves the worktree to where `gitwt.path` puts the branch, so `git branch -m` followed by `gitwt move <new-name>` keeps the folder in step. A given path that's an existing folder or ends in `/` means "into it", like `mv`. Missing parent folders are created, and removed again if the move fails. If you're inside, you move with it to the same subfolder. Refused up front with nothing changed: the main repo, an existing destination (naming the branch or repo that has it, for the default path), a destination inside the worktree, a locked worktree (with the unlock command), and another drive. Submodules get git's refusal plus a tip. The generic note prints after every move. No `--force`: a lock is deliberate, so unlocking explicitly is clearer than overriding it. Added 27 tests; full suite 128/128 on bash 5.2, and renaming plus moving from inside were run by hand under zsh, along with completion.
 
 **Modified files**:
 - gitwt.sh
@@ -114,6 +114,8 @@ The usage guide explains it in more detail.
 - test/move.bats
 - docs/usage.md
 - README.md
+
+**Review**: an independent review of PR #7 found three bugs, all fixed with tests: folders left behind when creating the parent folders failed partway; a false "already at" under zsh for a worktree path containing a backslash (`_gitwt_find_path` printed with zsh's `echo`); and a locked worktree with a backslash in its path not detected (`awk -v`). It also found message and docs gaps, now fixed: "into itself" through a symlink is refused by gitwt, a symlinked folder is documented as the destination itself, the different-drive and submodule tips print a `git worktree add` command instead of suggesting `gitwt new`, the current location written out says "already at", a file on the path gets a clear error, and completion no longer offers the main repo's branch or folders past the second argument.
 
 ### TASK-004 | Automate new worktree setup with .worktreeinclude and a post-create hook
 **Status**: done  

@@ -190,7 +190,7 @@ _gitwt_find_path() {
     return 1
   fi
 
-  echo "$found"
+  printf '%s\n' "$found"
 }
 
 # Prints the files in <dir> that a .worktreeinclude lists and git ignores, NUL-separated.
@@ -603,9 +603,29 @@ _gitwt_mount_of() {
   df -P "$p" 2>/dev/null | awk 'NR == 2 { for (i = 6; i <= NF; i++) printf "%s%s", $i, (i < NF ? " " : "\n") }'
 }
 
+# Prints <path>, or its nearest ancestor that exists.
+_gitwt_existing_ancestor() {
+  local p="$1"
+  while [[ ! -e "$p" && "$p" != "/" ]]; do p="$(dirname "$p")"; done
+  printf '%s\n' "$p"
+}
+
+# Removes the folders between <deepest> and <topmost> that gitwt created for a move that then
+# failed, deepest first. Skips ones that were never made, and stops at any that isn't empty.
+_gitwt_remove_created_dirs() {
+  local d="$1" top="$2"
+  while :; do
+    if [[ -d "$d" ]]; then rmdir "$d" 2>/dev/null || return 0; fi
+    [[ "$d" == "$top" || "$d" == "/" ]] && return 0
+    d="$(dirname "$d")"
+  done
+}
+
 # Whether the worktree registered at <path> is locked.
 _gitwt_is_locked() {
-  git worktree list --porcelain | awk -v target="$1" '
+  # ENVIRON, not -v: awk -v would expand backslashes in the path
+  git worktree list --porcelain | GITWT_TARGET="$1" awk '
+    BEGIN        { target = ENVIRON["GITWT_TARGET"] }
     /^worktree / { path = substr($0, 10) }
     /^locked/    { if (path == target) found = 1 }
     END          { exit !found }
@@ -636,8 +656,12 @@ _gitwt_move() {
 
   local main_root wt_physical main_physical
   main_root="$(_gitwt_main_repo_root)"
-  wt_physical="$(cd "$worktree_path" && pwd -P)"
-  main_physical="$(cd "$main_root" && pwd -P)"
+  wt_physical="$(cd "$worktree_path" 2>/dev/null && pwd -P)"
+  main_physical="$(cd "$main_root" 2>/dev/null && pwd -P)"
+  if [[ -z "$wt_physical" || -z "$main_physical" ]]; then
+    echo "Error: could not open the worktree at: $worktree_path" >&2
+    return 1
+  fi
 
   if [[ "$wt_physical" == "$main_physical" ]]; then
     echo "Error: '$branch' is checked out in the main repo, which can't be moved with gitwt." >&2
@@ -652,7 +676,13 @@ _gitwt_move() {
     dest="$(_gitwt_generate_path "$branch")" || return 1
   else
     [[ "$dest" == /* ]] || dest="$PWD/$dest"
-    # An existing folder, or a path ending in /, means "into this folder"
+    # The worktree's own folder, however it's written, means it's already there
+    if [[ -d "$dest" && "$(cd "$dest" && pwd -P)" == "$wt_physical" ]]; then
+      echo "'$branch' is already at: $worktree_path"
+      return 0
+    fi
+    # An existing folder, or a path ending in /, means "into this folder". A symlink to a
+    # folder is not followed: it's treated as the destination itself, which already exists.
     if [[ "$dest" == */ || ( -d "$dest" && ! -L "$dest" ) ]]; then
       dest="${dest%/}/$(basename "$worktree_path")"
     fi
@@ -675,7 +705,16 @@ _gitwt_move() {
     return 1
   fi
 
-  if [[ "$dest" == "$worktree_path/"* || "$dest" == "$wt_physical/"* ]]; then
+  # Resolve the nearest existing folder, so a symlink into the worktree is caught too
+  local ancestor ancestor_physical
+  ancestor="$(_gitwt_existing_ancestor "$(dirname "$dest")")"
+  if [[ ! -d "$ancestor" ]]; then
+    echo "Error: $ancestor is a file, so it can't hold the destination: $dest" >&2
+    return 1
+  fi
+  ancestor_physical="$(cd "$ancestor" && pwd -P)"
+  if [[ "$dest" == "$worktree_path/"* || "$dest" == "$wt_physical/"* \
+        || "$ancestor_physical" == "$wt_physical" || "$ancestor_physical" == "$wt_physical/"* ]]; then
     echo "Error: can't move a worktree into itself: $dest" >&2
     return 1
   fi
@@ -688,7 +727,7 @@ _gitwt_move() {
 
   if [[ "$(_gitwt_mount_of "$worktree_path")" != "$(_gitwt_mount_of "$dest")" ]]; then
     echo "Error: $dest is on a different drive, and git can only move a worktree within one drive." >&2
-    echo "Tip: push or commit your work, remove this worktree, then create it again there with 'gitwt new $branch'." >&2
+    echo "Tip: push or commit your work, remove this worktree, then create it again there with: git worktree add $(_gitwt_quote "$dest") $branch" >&2
     return 1
   fi
 
@@ -698,7 +737,10 @@ _gitwt_move() {
   if [[ ! -d "$parent" ]]; then
     first_new="$parent"
     while [[ ! -d "$(dirname "$first_new")" ]]; do first_new="$(dirname "$first_new")"; done
-    mkdir -p "$parent" || return 1
+    if ! mkdir -p "$parent"; then
+      _gitwt_remove_created_dirs "$parent" "$first_new"
+      return 1
+    fi
   fi
 
   local here inside=0 suffix=""
@@ -710,15 +752,9 @@ _gitwt_move() {
 
   echo "Moving '$branch' to: $dest"
   if ! git -C "$main_root" worktree move "$worktree_path" "$dest"; then
-    if [[ -n "$first_new" ]]; then
-      local d="$parent"
-      while rmdir "$d" 2>/dev/null; do
-        [[ "$d" == "$first_new" ]] && break
-        d="$(dirname "$d")"
-      done
-    fi
+    [[ -n "$first_new" ]] && _gitwt_remove_created_dirs "$parent" "$first_new"
     if [[ -f "$worktree_path/.gitmodules" ]]; then
-      echo "Tip: git can't move a worktree that contains submodules. Push or commit your work, remove it, then create it again with 'gitwt new $branch'." >&2
+      echo "Tip: git can't move a worktree that contains submodules. Push or commit your work, remove it, then create it again there with: git worktree add $(_gitwt_quote "$dest") $branch" >&2
     fi
     return 1
   fi

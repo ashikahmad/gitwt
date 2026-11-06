@@ -148,7 +148,7 @@ gitwt move feature/new ../somewhere-else     # to exactly ../somewhere-else
 ```
 
 - **Without `<new-path>`,** it goes where [`gitwt.path`](#where-worktrees-go) puts that branch. Use this after renaming a branch with `git branch -m`, or after changing `gitwt.path`.
-- **With `<new-path>`,** a relative path starts from your current folder. If it's an existing folder, or ends in `/`, the worktree goes inside it, keeping its folder name, like `mv`.
+- **With `<new-path>`,** a relative path starts from your current folder. If it's an existing folder, or ends in `/`, the worktree goes inside it, keeping its folder name, like `mv`. A symlink to a folder isn't followed: it counts as the destination itself, which already exists, so the move is refused. Naming the worktree's current folder just says it's already there.
 - **Missing parent folders are created,** and removed again if the move fails.
 - **If you're inside the worktree,** you're moved with it, to the same subfolder.
 
@@ -175,10 +175,11 @@ restarting: virtualenvs, build caches, absolute symlinks, or programs still runn
 |---|---|
 | The main repo's branch | The main repo can't be moved with gitwt |
 | Destination already exists | Without `<new-path>`, it also says which branch or repo has the folder |
-| Destination inside the worktree itself | Can't move a folder into itself |
+| Destination inside the worktree itself, including through a symlink | Can't move a folder into itself |
+| A file where a folder should be on the destination path | It can't hold the destination |
 | A locked worktree | Unlock it with `git worktree unlock <path>` if the lock is no longer needed |
-| Another drive | git can only move within one drive. Push or commit, remove the worktree, and create it again there |
-| A worktree with submodules | git doesn't support it. Push or commit, remove it, and create it again |
+| Another drive | git can only move within one drive. Push or commit, remove the worktree, then create it again there with the `git worktree add` command gitwt prints. `gitwt new` can't, since it always uses `gitwt.path` |
+| A worktree with submodules | git doesn't support it. Push or commit, remove it, then create it again there with the `git worktree add` command gitwt prints |
 
 ### `gitwt list`
 
@@ -442,7 +443,8 @@ Files gitwt reads:
 
 - subcommands after `gitwt `,
 - for `new`: local branches that don't have a worktree yet, plus `--from` and `--fetch`; after `--from`, all local branches,
-- for `switch`, `remove` and `move`: branches that have a worktree, plus `--branch` for `remove`, and folders for `move`'s second argument.
+- for `switch` and `remove`: branches that have a worktree, plus `--branch` for `remove`,
+- for `move`: branches that have a worktree, except the main repo's, then folders for the second argument.
 
 Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command not found: compdef` at startup (TASK-014). bash has no completion yet.
 
@@ -470,9 +472,10 @@ Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command
 | `… failed. The worktree was still created.` | The setup script exited with an error | Fix it and run it by hand in the worktree |
 | `no worktree found for branch 'x'` | `x` has no worktree | `gitwt list` |
 | `'x' is already at: …` | `move` without a path, and it's already where `gitwt.path` puts it | Nothing to do |
-| `is on a different drive` | `move` across drives isn't possible | Remove it and create it again there |
+| `is on a different drive` | `move` across drives isn't possible | Remove it, then run the `git worktree add` command it prints |
 | `is locked, so git won't move it` | Someone locked the worktree | `git worktree unlock <path>` if that's safe |
-| `can't move a worktree that contains submodules` | A git limitation | Remove it and create it again there |
+| `can't move a worktree that contains submodules` | A git limitation | Remove it, then run the `git worktree add` command it prints |
+| `is a file, so it can't hold the destination` | Part of the `move` path is a file | Pick another path |
 | `worktree path no longer exists` | The folder was deleted outside git | `git worktree prune` |
 | `'x' has uncommitted changes or untracked files` | `remove` won't discard work | Commit or stash, or `gitwt remove x --force` if you're sure |
 | `removing this worktree would lose files listed in .worktreeinclude` | A listed file was changed in the worktree, or exists only there | Run the `diff` or `cp` commands it prints, then remove again; or `--force` |
