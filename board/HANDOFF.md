@@ -1,46 +1,36 @@
 # gitwt handoff
 
-Written 2026-11-06 at the end of a long working session, so the next session can carry on without the conversation. The board ([`kanban.md`](kanban.md), [read-only view](https://ashikahmad.github.io/Kanban.md/app/?board=https://github.com/ashikahmad/gitwt/blob/dev/board/kanban.md)) has the detail for every task; this file is the map.
+Written 2026-11-06, updated after PR #10 was merged, so the next session can carry on without the conversation. The board ([`kanban.md`](kanban.md), [read-only view](https://ashikahmad.github.io/Kanban.md/app/?board=https://github.com/ashikahmad/gitwt/blob/dev/board/kanban.md)) has the detail for every task; this file is the map.
 
 ## Where things stand
 
 | | |
 |---|---|
-| `main` | `f4d1f40`, unchanged since the session started; 40 commits behind `dev`. Tag `v0.1.0` exists |
-| `dev` | `e67c001`; has PRs #1–#9 merged, plus board and docs commits |
-| Open PR | [#10](https://github.com/ashikahmad/gitwt/pull/10) `feat/one-line-install` → `dev`, head `a6d4c71`; **reviewed, findings below not fixed yet** |
-| Version | `0.1.0` on `dev`; PR #10 bumps it to `0.2.0` |
-| Tests | 155 on `dev`, 173 on PR #10's branch; all pass on bash 5.2 |
-| Board on `dev` | 12 done, 14 backlog, 1 in review (TASK-034, the website, waiting for release). On PR #10's branch, TASK-008/014/022/036 are in review |
+| `main` | `f4d1f40`, unchanged since the work began; far behind `dev`. Tag `v0.1.0` exists |
+| `dev` | PRs #1–#10 merged, plus board and docs commits |
+| Open PRs | none |
+| Version | `0.2.0` on `dev`, not released or tagged yet |
+| Tests | 213 on `dev`, all pass on bash 5.2 (`./run_tests.sh`, ~4 min) |
+| Board on `dev` | 15 done; 13 backlog; in review: TASK-034 (website) and TASK-036 (one-line install), both waiting for the release |
+| Issues | [#11](https://github.com/ashikahmad/gitwt/issues/11) bash tab-completion, a `vote` issue (👍 counts decide; TASK-037) |
 
-## Next steps, in order
-
-1. **Fix PR #10's review findings** (below), each with a test that fails on the reviewed code, then push to the same branch and update the PR description. Consider a fresh independent review afterwards.
-2. **Merge PR #10 into `dev`.** Move TASK-008, TASK-014, TASK-022 and TASK-036 to Done (TASK-036 keeps its last subtask open until the tag exists).
-3. **Release** (see the checklist below).
-
-### PR #10 review findings to fix
-
-Reproduced by an independent review (fake `curl`, throwaway `HOME`):
-
-1. **Bug, install.sh:135-138:** a zsh user with a `~/.bashrc` but no `~/.zshrc` (Ubuntu's default home; macOS with an old `.bashrc`) gets only `.bashrc` wired up, and gitwt never loads in zsh, though the installer says it's installed. `$SHELL` is only consulted when neither file exists. **Fix:** when `$SHELL` is zsh or bash, always wire up that shell, creating its rc file if missing; also wire up other rc files that exist.
-2. **install.sh:140:** a `.zshrc` the installer creates has no `compinit`, so `_gitwt`'s new `compdef` guard silently skips completion: the main macOS case. The guide says zsh gets tab-completion. **Fix:** when creating `.zshrc`, write `autoload -Uz compinit && compinit` before the gitwt lines.
-3. **install.sh:94-104:** if `~/.config/gitwt/gitwt.sh` is a symlink to somewhere else (an old clone, a dotfile manager), a piped install replaces the link with a regular file. **Fix:** decide: probably leave a symlink alone and say how to update it (or follow it and refuse); test both "same file" and "points elsewhere".
-4. **install.sh:120 `has_source_line`:** matches too much and too little. False "already loads": `source ~/work/othertool/gitwt.sh` (a different clone stays in use while the message says 0.2.0 is installed), `echo "run: source ~/.config/gitwt/gitwt.sh"`, `gitwtXsh` (unescaped `.`). False "missing": `…/gitwt.sh#x`, `PS1="#> "; source …`, `…gitwt.sh&&true`. **Fix:** match the installed path specifically (`.config/gitwt/gitwt.sh` via `$HOME`, `${HOME}`, `~`, an absolute home path, or `$XDG_CONFIG_HOME`), escape the dot, and allow `&`/`|`/`#` after it; keep the cases the review found working (`[[ -f … ]] && . …`, `${HOME}`, trailing comments, commented-out lines, tab indent, inside `if … fi`).
-5. **Truncated download:** the script body isn't wrapped in a function, so `curl … | bash` cut short can exit 0 having done half the work (e.g. files installed, no rc line). **Fix:** wrap everything in `main() { … }` and call `main "$@"` on the last line.
-6. Nits: two installs at once can add the line twice; `curl … | sh` fails with `set: Illegal option -o pipefail` (say "use bash" or re-exec); running a symlink to install.sh downloads instead of using the clone; the final `source $ZSHRC` hint isn't quoted (breaks with spaces in `HOME`); sourcing install.sh leaves `errexit`/`nounset` on.
-7. Docs: the by-hand steps download from `main` while the one-liner uses the tag, and `cd` the user into `~/.config/gitwt`; the "read it first" `bash install.sh` installs local files if run in a folder that holds `gitwt.sh` and `_gitwt` (download to a temp folder instead).
-
-Suspected, not reproduced: `ZDOTDIR` set only inside zsh isn't seen by the bash running the installer; macOS users whose old install wrote to `.zprofile` would also get lines in a new `.zshrc` (loads twice) — consider recognising `.zprofile`/`.bash_profile` lines too.
-
-### Release checklist
+## Next step: release v0.2.0
 
 1. **Owner:** Settings → Pages → Source: **GitHub Actions** (needed for the site workflow).
-2. Open a release PR `dev` → `main` with release notes. Call out: `gitwt ls` no longer shows CHANGES without `-l`; `gitwt remove` refuses when it would lose uncommitted work or an edited listed file (`--force` overrides); bash 3.2 isn't officially supported; the one-line install.
-3. After merging, **tag `v0.2.0` on `main` and push the tag.** Until the tag exists, the one-liner downloads 404 and installs nothing. Consider creating a GitHub release from it.
-4. Check: the Pages workflow run, `https://ashikahmad.github.io/gitwt/` and `/docs/`, and the one-liner in a throwaway `HOME` (`HOME=$(mktemp -d) SHELL=/bin/zsh bash -c 'curl -fsSL …/main/install.sh | bash'`).
-5. Then (TASK-034's last subtasks): link the site from the README and `gitwt help` (the help text currently links to `docs/usage.md` on `main` on GitHub), move TASK-034 and TASK-036 to Done.
-6. Optionally delete the merged feature branches on GitHub (all `fix/*`, `feat/*` and `docs/*` except any still open).
+2. Open a release PR `dev` → `main` with release notes. Call out:
+   - one-line install (`curl -fsSL …/main/install.sh | bash`), from the `v0.2.0` tag;
+   - `gitwt ls` no longer shows CHANGES without `-l` (`-l` adds it; `-s` is a bare list);
+   - `gitwt remove` refuses when it would lose uncommitted work or an edited listed file (`--force` overrides);
+   - `gitwt move`, `gitwt.path`, `.worktreeinclude` and the setup script;
+   - **bash 3.2 isn't supported:** every `gitwt` command there stops with a two-line message and a link; the installer asks before installing for a bash-older-than-4 login shell (with no terminal it installs nothing unless `GITWT_INSTALL_ANYWAY=1`).
+3. After merging, **tag `v0.2.0` on `main` and push the tag right away**: until it exists the one-liner gets a 404. Consider a GitHub release from it.
+4. Check:
+   - the Pages workflow run, `https://ashikahmad.github.io/gitwt/` and `/docs/`;
+   - the one-liner in a throwaway `HOME` (`HOME=$(mktemp -d) SHELL=/bin/zsh bash -c 'curl -fsSL …/main/install.sh | bash'`), ideally also on the owner's Mac;
+   - **the link in the bash 3.2 messages**, `https://ashikahmad.github.io/gitwt/docs/#whats-supported`, lands on "What's supported";
+   - the guide's external links to Homebrew's bash formula and Apple's "Use zsh as the default shell" page (those hosts aren't reachable from cloud sessions).
+5. Then: link the site from the README and `gitwt help` (help still links `docs/usage.md` on GitHub); move TASK-034 and TASK-036 to Done.
+6. Optionally delete the merged feature branches on GitHub.
 
 ## What's been done (merged into `dev`)
 
@@ -54,6 +44,7 @@ Suspected, not reproduced: `ZDOTDIR` set only inside zsh isn't seen by the bash 
 | #7 | `gitwt move` / `mv` | 003 |
 | #8 | Website: hand-written landing page + Just the Docs guide, Catppuccin Latte/Frappé, green accent; deploys from `main` | 034 (in review) |
 | #9 | `gitwt ls` instant by default (3 git commands), `-l` adds CHANGES, `-s` bare list | 033, 019 |
+| #10 | One-line install from the version tag; installer rewritten (two independent reviews, tested on macOS 26 with `/bin/bash` 3.2); bash 3.2 not-supported check in `gitwt`; "What's supported" and Uninstall in the guide | 036 (in review), 008, 014, 022 |
 
 Also on the board: 8 archived `#history` tasks (TASK-025–032) recording what existed before the board.
 
@@ -69,8 +60,13 @@ Don't reopen these without a reason:
 - **`ls`:** default reads only git's records; anything that reads every file goes behind `-l`; `-s` stays for scripts and the planned picker.
 - **Site:** builds from `main` so it documents the released version; the guide is copied from `docs/usage.md` at build time (one source); the landing page is hand-written, so update it with the README when features change. Light-mode accent is `#307820` (Catppuccin Latte green darkened for 4.5:1 contrast); dark uses Frappé's `#a6d189`.
 - **Install:** the one-liner downloads from the version tag, not `main`. Homebrew left for later.
+- **bash 3.2:** not supported. `gitwt` checks once at the top and stops every command (help and version too) with two lines: the fact and the site link. Neither script tells people to change shells; the guide lists options (use zsh or a newer bash alongside, without changing the default). The installer checks the login shell (`$SHELL`), not the bash running it (on a Mac that's always 3.2), asks on `/dev/tty` before changing anything (default no), and on yes also sets up zsh if installed.
+- **Demand:** "not yet" features get a GitHub issue with the `vote` label; people 👍 it, and the guide/site link to it where the gap shows. Bash completion is #11.
 
 ## Backlog worth picking up next
+
+- **TASK-038:** an uninstaller (`install.sh --uninstall`); the guide has by-hand steps meanwhile. Edits shell config, so its own PR and review.
+- **TASK-037:** bash tab-completion, only if #11 gets votes.
 
 - **TASK-035:** `gitwt sw` with no branch opens a picker (fzf if installed, numbered menu otherwise), using `ls -s`'s single-call list.
 - **TASK-015:** run the suite under zsh too and add CI (the suite is bash-only; zsh is checked by hand).

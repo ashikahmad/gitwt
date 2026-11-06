@@ -185,11 +185,12 @@ With a fetched `origin/feature/x` and no local branch, `gitwt new feature/x` cre
 Argument parsing lets the last positional win and treats unknown flags as branch names. `gitwt remove a b` removes only b. `gitwt new foo --frm develop` targets `develop` and drops `foo`. `gitwt remove --force a` removes a without forcing or complaining. `gitwt nwe foo` prints help and returns 0 (gitwt.sh:16), so typos in scripts pass silently.
 
 ### TASK-008 | Fix install.sh reporting success when nothing was wired up
-**Status**: in-review  
+**Status**: done  
 **Priority**: High  
 **Category**: Install  
 **Created**: 2026-11-05  
 **Started**: 2026-11-06  
+**Finished**: 2026-11-06  
 **Tags**: #bug  
 
 With no `.zshrc`, `.bashrc` or `.zprofile`, install.sh prints `not found — skipping` for each file, then `==> Done!`, returns 0 and says to `source ~/.zshrc`, which does not exist. A new shell cannot find `gitwt`. The Darwin fallback helps only when `.zprofile` already exists, and the `.bash_profile` fallback named in the comment is not implemented.
@@ -253,11 +254,12 @@ Three related problems around gitwt.sh:237-243. The check is a plain string pref
 When the branch delete fails, the function still returns 0 and always blames unmerged commits (gitwt.sh:250-254). A branch used by another worktree and a stale ref lock both produce the wrong tip with status 0. test/remove.bats:37 checks the tip but not the status.
 
 ### TASK-014 | Stop zsh startup error when compinit has not run
-**Status**: in-review  
+**Status**: done  
 **Priority**: Medium  
 **Category**: Shell Integration  
 **Created**: 2026-11-05  
 **Started**: 2026-11-06  
+**Finished**: 2026-11-06  
 **Tags**: #bug  
 
 Without compinit, sourcing `_gitwt` fails with `command not found: compdef` (_gitwt:96). install.sh adds the source line without checking, so a `.zshrc` without compinit prints the error at every shell start. `gitwt` itself still loads, and a `.zshrc` that runs compinit earlier is unaffected.
@@ -361,11 +363,12 @@ Under bash 3.2, printf pads by bytes, so `✓`, `·` and `─` misalign rows (PA
 The check at gitwt.sh:33 never fires because the pipeline's status is awk's. Outside a repo, git's `not a git repository` prints first, then gitwt adds a misleading line: `could not determine current branch (are you in detached HEAD state?)`, or `base branch 'x' does not exist locally` with `--from x`. `gitwt list` already handles this correctly.
 
 ### TASK-022 | Make install.sh handle earlier installs correctly
-**Status**: in-review  
+**Status**: done  
 **Priority**: Medium  
 **Category**: Install  
 **Created**: 2026-11-05  
 **Started**: 2026-11-06  
+**Finished**: 2026-11-06  
 **Tags**: #bug  
 
 Reinstalling over the installer's own earlier install works: files are updated and no lines are duplicated. Other kinds of earlier install go wrong. Tested in throwaway home directories.
