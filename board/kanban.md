@@ -20,49 +20,57 @@
 ## Tasks
 
 ### TASK-001 | Protect ignored files when removing a worktree
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: High  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-06  
 **Tags**: #bug #feature  
-**Blocked by**: TASK-004  
 
-`gitwt remove` relies on `git worktree remove` (gitwt.sh:243), which refuses modified, staged and untracked files but deletes ignored files without warning. A test worktree with an ignored `.env` was removed with exit 0 and the file was gone for good. gitwt also has no `--force` flag of its own, so forcing means dropping to raw git.
+`gitwt remove` relies on `git worktree remove`, which refuses modified, staged and untracked files but deletes ignored files without warning. A test worktree with an ignored `.env` was removed with exit 0 and the file was gone for good. gitwt also has no `--force` flag of its own, so forcing means dropping to raw git. Since TASK-004, gitwt copies `.env` and similar files into every new worktree, which makes editing them there, and losing the edits on removal, more likely.
 
 **Subtasks**:
-- [ ] Read `.worktreeinclude` from the worktree being removed, using the helper built in TASK-004
-- [ ] Compare listed ignored files with the main repo's copy
-- [ ] Refuse removal when a listed file differs from main, and suggest backing it up before using `--force`
-- [ ] When a listed file is not in main, offer to copy it there, first checking it is ignored on main with `git check-ignore`
-- [ ] If the copy is declined or the file is not ignored on main, refuse removal
-- [ ] Mention unlisted ignored paths in one line
-- [ ] Without a `.worktreeinclude`, ask once before deleting any ignored files and suggest adding one
-- [ ] With no terminal, refuse wherever a prompt would appear, unless `--force` is given
-- [ ] Add `gitwt remove --force`
-- [ ] Add tests for each case above
-- [ ] Document what removal does and does not protect
+- [x] Check the files listed in the main repo's `.worktreeinclude`, using the helper from TASK-004
+- [x] Stay quiet when a listed file is an unchanged copy of the main repo's
+- [x] Refuse when a listed file was changed in the worktree, naming it and showing how to compare it
+- [x] Refuse when a listed file exists only in the worktree, showing the command to copy it out, with a warning if it isn't ignored in the main repo
+- [x] Mention other ignored files in one line, without asking; without a `.worktreeinclude`, suggest adding one
+- [x] Add `gitwt remove --force`, which skips these checks and discards uncommitted work
+- [x] Refuse the main worktree with a clear message (TASK-002)
+- [x] Make the failed-removal tip accurate about `--force` (TASK-002)
+- [x] Only leave the worktree once removal goes ahead, and return you where you were if it fails (TASK-012)
+- [x] Compare whole, physical paths when deciding whether you're inside the worktree (TASK-012)
+- [x] Add tests for each case, and update the usage guide and `gitwt help`
 
 **Notes**:
-**Design**: `.worktreeinclude` already says which ignored files matter, so it can answer what to bring into a new worktree and what to check before deleting one. Being listed does not make a file at risk: an unchanged copy loses nothing because main still has it. A listed file that matches main stays quiet. A listed file that differs from main makes removal refuse, with a suggestion to back it up before using `--force` if needed; gitwt does not offer a backup. A listed file that is not in main gets an offer to copy it there, only if `git check-ignore` confirms it is ignored on main, so a secret cannot become committable. gitwt compares only against main, not other worktrees. Unlisted paths such as `node_modules/` get a one-line mention, so there is no prompt on every removal and no separate "safe to delete" list.
+**Design**: `.worktreeinclude` already says which ignored files matter, so the same list decides what's copied into a new worktree and what's checked before deleting one. Being listed doesn't make a file at risk: an unchanged copy loses nothing, because the main repo still has it. gitwt compares only with the main repo, not other worktrees. There are no prompts: a file at risk makes `remove` refuse and say what to do, so it behaves the same with or without a terminal, and gitwt never writes into the main repo. Unlisted ignored files, such as `node_modules/` or `dist/`, are mentioned in one line but never block removal; asking about them would happen on almost every removal and train people to say yes.
 
-**Open question**: should unlisted ignored files also block removal? Proposed answer is no, because blocking on everything brings the noise back. The cost is that an unlisted `local.db` is deleted after only a one-line notice. Not yet decided.
+**Plan**: revised 2026-11-06. TASK-004 came first and is done. This task also takes in TASK-002 and TASK-012, which change the same lines of `_gitwt_remove`. The data-loss risk stays until this task is done.
 
-**Tried**: in a scratch repo, `git ls-files --others --ignored --exclude-from=.worktreeinclude` listed `.env`, `.env.local` and `config/secrets.json` and left out `node_modules/` and `local.db`, and `cmp` against main's copy sorted them correctly. It also lists untracked files that are not ignored, which is harmless because git already refuses to remove a worktree containing those. None of this is in gitwt yet.
+**Result**: `gitwt remove` now refuses when it would lose a file listed in the main repo's `.worktreeinclude`: one changed in the worktree gets a `diff` command, one that exists only there gets a `cp` command, with a warning if the main repo doesn't ignore it. Unchanged copies are removed quietly, and other ignored files are named in one line. It also refuses uncommitted work up front, before moving you anywhere, and refuses the main repo's own branch. `--force` skips the checks. You're moved out of the worktree only once removal goes ahead, and returned if git still refuses (for example, a locked worktree). No prompts, so scripts and terminals behave the same. Added 14 tests; 12 fail against the old code, and the other 2 guard cases the old code already handled. Full suite 101/101 on bash 5.2, and the main cases were run by hand under zsh.
 
-**Plan**: two separate pieces of work. TASK-004 is done first, then this task, which reuses its `.worktreeinclude` helper. The data-loss risk stays until this task is done.
+**Modified files**:
+- gitwt.sh
+- test/remove.bats
+- docs/usage.md
+- README.md
 
 ### TASK-002 | Make the failed-removal tip accurate about --force
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-06  
 **Tags**: #bug  
 
 When removal fails, gitwt.sh:244 suggests `git worktree remove --force` whatever the cause, and does not say that it permanently discards the uncommitted work git was protecting. The main worktree gets the same tip, although `--force` cannot remove it.
 
 **Subtasks**:
-- [ ] Say that `--force` discards uncommitted work
-- [ ] Only suggest `--force` when it applies
+- [x] Say that `--force` discards uncommitted work
+- [x] Only suggest `--force` when it applies
+
+**Notes**:
+**Plan**: done as part of TASK-001, which adds `gitwt remove --force` and rewrites this tip.
 
 ### TASK-003 | Add gitwt move to relocate or rename a worktree
 **Status**: backlog  
@@ -198,18 +206,22 @@ When `--fetch` branches from the remote-tracking ref (behind case, or diverged c
 `--fetch` assumes the upstream has the same name as the local base (gitwt.sh:149-152). When `dev` tracks `origin/develop`, it fails with `couldn't find remote ref dev`. If an `origin/dev` also exists, it branches from that and ignores the real upstream, returning 0.
 
 ### TASK-012 | Fix current-directory handling in gitwt remove
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-06  
 **Tags**: #bug  
 
 Three related problems around gitwt.sh:237-243. The check is a plain string prefix, so from `feature-x-2`, removing `feature/x` wrongly moves the shell to the main repo (the right worktree is still removed). The cd happens before removal, so a failed removal still leaves you in the main repo. Entering a worktree through a symlink defeats the check, so it is deleted around you and the shell is left in a missing directory; this does not happen if you got there via `gitwt new`.
 
 **Subtasks**:
-- [ ] Compare whole path components
-- [ ] Only leave the worktree once removal can go ahead
-- [ ] Compare physical paths
+- [x] Compare whole path components
+- [x] Only leave the worktree once removal can go ahead
+- [x] Compare physical paths
+
+**Notes**:
+**Plan**: done as part of TASK-001, which adds new ways for removal to be refused; with the cd still happening first, each refusal would leave you in the main repo.
 
 ### TASK-013 | Report gitwt remove --branch failures correctly
 **Status**: backlog  
