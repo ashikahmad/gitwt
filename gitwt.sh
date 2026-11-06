@@ -65,6 +65,12 @@ _gitwt_generate_path() {
     return 1
   fi
 
+  # Git doesn't expand shell variables, so '$HOME/wts' would become a folder named '$HOME'
+  if [[ "$template" == *'$'* ]]; then
+    echo "Error: gitwt.path can't use shell variables such as \$HOME: '$template'. Use ~ for your home folder, or write the full path." >&2
+    return 1
+  fi
+
   if [[ "$template" != *\{slug\}* && "$template" != *\{branch\}* ]]; then
     echo "Error: gitwt.path must contain {slug} or {branch}, otherwise every worktree gets the same path: '$template'" >&2
     return 1
@@ -623,6 +629,7 @@ WORKTREE PATH LAYOUT
 
   Placeholders: {repo}, {slug} (feature-dark-mode), {branch} (feature/dark-mode).
   Must include {slug} or {branch}. Relative paths start from the main repo root.
+  Use ~ for your home folder; shell variables such as $HOME aren't expanded.
   Existing worktrees stay where they are.
 
 TYPICAL WORKFLOW

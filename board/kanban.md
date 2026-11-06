@@ -258,6 +258,11 @@ Without `--recurse-submodules`, `test/libs/*` is empty and run_tests.sh fails wi
 **Notes**:
 **Result**: the error now says what is using the folder: a branch, a detached worktree, a checkout of another repo, or something that isn't a worktree. Each case gets its own tip. Done together with TASK-023, which makes these clashes easier to hit.
 
+**Modified files**:
+- gitwt.sh
+- README.md
+- test/path_config.bats
+
 ### TASK-019 | Fix gitwt list alignment and bare repo display
 **Status**: backlog  
 **Priority**: Low  
@@ -323,7 +328,7 @@ New worktrees always went to `../worktrees/<repo>/<slug>`. The `gitwt.path` git 
 
 **Subtasks**:
 - [x] Resolve the template in `_gitwt_generate_path`
-- [x] Reject templates with no `{slug}` or `{branch}`, and unknown placeholders
+- [x] Reject templates with no `{slug}` or `{branch}`, unknown placeholders, and shell variables such as `$HOME`
 - [x] Note when a worktree inside the repo isn't ignored
 - [x] Keep the developer's own git config out of the tests
 - [x] Add tests and update the README and `gitwt help`

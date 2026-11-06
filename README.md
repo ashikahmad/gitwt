@@ -29,6 +29,7 @@ With raw git you'd need to `git checkout develop && git pull && git checkout -b 
 - **`switch` / `sw`** — jump into any worktree by branch name
 - **`remove`** — tear down a worktree; auto-returns you to the main repo if you're inside it
 - **`list` / `ls`** — clean table of all worktrees with branch and relative path
+- **Custom worktree paths** — choose where new worktrees go with a `gitwt.path` template, per repo or for all repos
 - **New worktree setup** — copy ignored files such as `.env` and run a setup script (your own, via `gitwt.postCreate`) automatically
 - **Zsh tab-completion** via the included `_gitwt` completion script
 
@@ -177,7 +178,7 @@ The default is `../worktrees/{repo}/{slug}`. Some other layouts:
 | `~/worktrees/{repo}/{branch}` | `~/worktrees/myrepo/feature/dark-mode` |
 | `.worktrees/{slug}` | `.worktrees/feature-dark-mode`, inside the repo |
 
-- The template must include `{slug}` or `{branch}`, and other placeholders are rejected.
+- The template must include `{slug}` or `{branch}`, and other placeholders are rejected. Shell variables such as `$HOME` are rejected too, because git doesn't expand them: use `~` or a full path.
 - Relative paths start from the main repo root, wherever you run `gitwt` from.
 - Paths can clash. `{slug}` gives `feature/a-b` and `feature-a/b` the same folder, a global template without `{repo}` puts all your repos in one folder, and two repos with the same folder name can clash even with `{repo}`. `gitwt new` stops and tells you which branch or repo is using the folder.
 - Inside the repo, a worktree shows as untracked until it's ignored. `gitwt new` prints the line to add to `.git/info/exclude`.

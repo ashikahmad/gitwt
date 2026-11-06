@@ -103,6 +103,17 @@ teardown() { teardown_repo; }
   [[ ! -e "$TEST_WORK_DIR/wt" ]]
 }
 
+@test "path config: shell variables like \$HOME → error, nothing created" {
+  git config gitwt.path '$HOME/wts/{slug}'
+  run "$GITWT_RUNNER" new feat
+  assert_failure
+  assert_output --partial "can't use shell variables"
+  assert_output --partial "Use ~"
+  [[ ! -e "$TEST_REPO/\$HOME" ]]
+  run git show-ref --verify --quiet refs/heads/feat
+  assert_failure
+}
+
 @test "path config: unreadable value → error" {
   git config gitwt.path '~nosuchuser-gitwt/{slug}'
   run "$GITWT_RUNNER" new feat
@@ -195,6 +206,20 @@ teardown() { teardown_repo; }
   assert_output --partial "__PWD__:$TEST_REPO/.worktrees/feat"
   assert_output --partial "not ignored"
   assert_output --partial "echo '.worktrees/' >> .git/info/exclude"
+}
+
+@test "path config: the not-ignored note comes before setup output" {
+  git config gitwt.path '.worktrees/{slug}'
+  mkdir -p .gitwt
+  printf '#!/bin/sh\necho SETUP-RAN\n' > .gitwt/post-create
+  chmod +x .gitwt/post-create
+  git add .gitwt; git commit -qm hook
+  git config gitwt.postCreateApproved "$(git hash-object --no-filters .gitwt/post-create)"
+  run "$GITWT_RUNNER" new feat </dev/null
+  assert_success
+  note_line="$(printf '%s\n' "$output" | grep -n 'not ignored' | cut -d: -f1)"
+  setup_line="$(printf '%s\n' "$output" | grep -n 'SETUP-RAN' | cut -d: -f1)"
+  [[ -n "$note_line" && -n "$setup_line" && "$note_line" -lt "$setup_line" ]]
 }
 
 @test "path config: inside the repo and ignored → no note" {
