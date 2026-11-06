@@ -20,11 +20,12 @@
 ## Tasks
 
 ### TASK-001 | Protect ignored files when removing a worktree
-**Status**: in-review  
+**Status**: done  
 **Priority**: High  
 **Category**: CLI  
 **Created**: 2026-11-05  
 **Started**: 2026-11-06  
+**Finished**: 2026-11-06  
 **Tags**: #bug #feature  
 
 `gitwt remove` relies on `git worktree remove`, which refuses modified, staged and untracked files but deletes ignored files without warning. A test worktree with an ignored `.env` was removed with exit 0 and the file was gone for good. gitwt also has no `--force` flag of its own, so forcing means dropping to raw git. Since TASK-004, gitwt copies `.env` and similar files into every new worktree, which makes editing them there, and losing the edits on removal, more likely.
@@ -56,11 +57,12 @@
 - README.md
 
 ### TASK-002 | Make the failed-removal tip accurate about --force
-**Status**: in-review  
+**Status**: done  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
 **Started**: 2026-11-06  
+**Finished**: 2026-11-06  
 **Tags**: #bug  
 
 When removal fails, gitwt.sh:244 suggests `git worktree remove --force` whatever the cause, and does not say that it permanently discards the uncommitted work git was protecting. The main worktree gets the same tip, although `--force` cannot remove it.
@@ -206,11 +208,12 @@ When `--fetch` branches from the remote-tracking ref (behind case, or diverged c
 `--fetch` assumes the upstream has the same name as the local base (gitwt.sh:149-152). When `dev` tracks `origin/develop`, it fails with `couldn't find remote ref dev`. If an `origin/dev` also exists, it branches from that and ignores the real upstream, returning 0.
 
 ### TASK-012 | Fix current-directory handling in gitwt remove
-**Status**: in-review  
+**Status**: done  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
 **Started**: 2026-11-06  
+**Finished**: 2026-11-06  
 **Tags**: #bug  
 
 Three related problems around gitwt.sh:237-243. The check is a plain string prefix, so from `feature-x-2`, removing `feature/x` wrongly moves the shell to the main repo (the right worktree is still removed). The cd happens before removal, so a failed removal still leaves you in the main repo. Entering a worktree through a symlink defeats the check, so it is deleted around you and the shell is left in a missing directory; this does not happen if you got there via `gitwt new`.
