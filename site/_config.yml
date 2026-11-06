@@ -17,7 +17,7 @@ back_to_top_text: Back to top
 footer_content: 'gitwt is released under the MIT license. This guide is built from <a href="https://github.com/ashikahmad/gitwt/blob/main/docs/usage.md">docs/usage.md</a>.'
 plugins:
   - jekyll-seo-tag
-exclude: [Gemfile, Gemfile.lock, prepare.sh, vendor]
+exclude: [Gemfile, Gemfile.lock, prepare.sh, split_guide.rb, check_links.rb, vendor]
 defaults:
   - scope:
       path: "docs"
