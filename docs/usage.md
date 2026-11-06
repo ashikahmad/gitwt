@@ -2,7 +2,7 @@
 
 Everything gitwt does, how to use it, and what happens when something goes wrong. For a short overview, see the [README](../README.md).
 
-- [Install](#install)
+- [Install](#install): [what's supported](#whats-supported), [ways to install](#ways-to-install), [uninstall](#uninstall)
 - [Commands](#commands): [`new`](#gitwt-new), [`switch`](#gitwt-switch), [`remove`](#gitwt-remove), [`move`](#gitwt-move), [`list`](#gitwt-list), [`version` and `help`](#gitwt-version-and-gitwt-help)
 - [Where worktrees go](#where-worktrees-go)
 - [Setting up new worktrees](#setting-up-new-worktrees)
@@ -19,38 +19,90 @@ Everything gitwt does, how to use it, and what happens when something goes wrong
 
 gitwt is a shell function, so it has to be sourced into your shell rather than run as a program. That's what lets it `cd` you into a worktree.
 
-**Requirements:** git 2.18 or newer, and zsh or bash.
+### What's supported
 
-**Tested with** zsh 5.9 and bash 5.2. bash 3.2, the version macOS ships as `/bin/bash`, isn't tested or officially supported: gitwt may work there, but changes aren't checked against it. On macOS, the default shell is zsh, which is supported.
+| | Supported | Tested with | Not supported |
+|---|---|---|---|
+| **Systems** | macOS, Linux | Linux; macOS 26 | Windows, except through WSL (untested) |
+| **Shells** | zsh; bash 4 or newer | zsh 5.9, bash 5.2 | bash 3.2, macOS's `/bin/bash`; fish and other shells |
+| **git** | 2.18 or newer | 2.43 | older |
+| **Tab-completion** | zsh | zsh 5.9 | bash (not yet: [👍 the issue](https://github.com/ashikahmad/gitwt/issues/11) if you'd use it) |
+| **Installer** | any bash, including macOS's 3.2, with `curl` or `wget` | bash 5.2; macOS's bash 3.2 | sh, without bash |
 
-**With the installer:**
+**Which shell am I using?** `echo $SHELL` shows your default shell; in bash, `echo $BASH_VERSION` shows its version. On macOS, zsh has been the default since macOS 10.15 (Catalina), so most Macs are ready. macOS's own bash, `/bin/bash`, is 3.2: there every `gitwt` command stops with a message saying it isn't supported, and the installer asks before installing.
+
+**If your shell is bash 3.2,** you don't have to change it. Any of these works:
+
+- **Use gitwt from zsh, without changing your default shell.** zsh comes with macOS, and most Linux systems have a `zsh` package. Type `zsh` in a terminal when you want gitwt; `exit` takes you back. If zsh is installed, the installer sets up `~/.zshrc` for this too.
+- **Install a newer bash** alongside the old one: on macOS with [Homebrew's bash](https://formulae.brew.sh/formula/bash) (`brew install bash`), elsewhere with your system's package manager. Start it by name (`bash` once it's first in your `PATH`) when you want gitwt.
+- **Make either one your default shell,** if you'd like: `chsh -s <path to the shell>`, which must be listed in `/etc/shells`. Apple explains it for zsh in [Use zsh as the default shell on your Mac](https://support.apple.com/en-us/102360).
+
+### Ways to install
+
+**With one command:**
 
 ```bash
-git clone https://github.com/ashikahmad/gitwt.git
-cd gitwt
-bash install.sh
-source ~/.zshrc    # or: source ~/.bashrc
+curl -fsSL https://raw.githubusercontent.com/ashikahmad/gitwt/main/install.sh | bash
 ```
 
-`install.sh` copies `gitwt.sh` and `_gitwt` to `~/.config/gitwt/` and adds source lines to `~/.zshrc` and `~/.bashrc`. It only edits files that already exist, and it skips a line that's already there. zsh also gets the tab-completion line.
+Then open a new terminal, or run `source ~/.zshrc` (or `~/.bashrc`).
+
+The installer:
+
+- puts `gitwt.sh` and `_gitwt` in `~/.config/gitwt/`, downloaded from this version's release tag, so a version always installs the same files,
+- adds the lines that load them to the config of your login shell (`~/.zshrc` or `~/.bashrc`, created if missing), and of the other shell if its config exists. zsh also gets tab-completion; a `.zshrc` it creates turns on `compinit` for that. It respects `ZDOTDIR`, even when set in `~/.zshenv`,
+- for bash on macOS, whose terminals start login shells, also adds the line to `~/.bash_profile` (or `.bash_login` or `.profile`, whichever bash reads), unless that file already reads `~/.bashrc`. If your shell is a bash older than 4, it says gitwt doesn't support it and asks before changing anything (in a script, with no terminal to ask, it installs nothing unless `GITWT_INSTALL_ANYWAY=1` is set),
+- skips a line that's already there, written any common way (`~/`, `$HOME/`, the full path or `$XDG_CONFIG_HOME/`; `source` or `.`), but not one that's commented out or inside quotes. If an older install put the lines in `.zprofile`, it adds them to `.zshrc` too and says you can delete the old ones,
+- leaves alone installed files that are links to another copy, or part of a git clone at `~/.config/gitwt` (update those with `git pull`),
+- needs bash, and `curl` or `wget`, and checks that what it downloaded is really gitwt before installing anything.
+
+**To read it first:**
+
+```bash
+cd "$(mktemp -d)"
+curl -fsSLO https://raw.githubusercontent.com/ashikahmad/gitwt/main/install.sh
+less install.sh
+bash install.sh
+```
+
+It's run from an empty temporary folder because, next to a `gitwt.sh` and `_gitwt`, the installer installs those instead of downloading.
+
+**From a clone:** `git clone https://github.com/ashikahmad/gitwt.git && bash gitwt/install.sh`. This copies the clone's files instead of downloading, so it installs whatever the clone has checked out.
+
+**Another version:** `GITWT_REF` picks the branch or tag to download, for example `… | GITWT_REF=main bash` for the latest unreleased changes.
 
 **By hand:**
 
 ```bash
 mkdir -p ~/.config/gitwt
-cp gitwt.sh _gitwt ~/.config/gitwt/
+curl -fsSL -o ~/.config/gitwt/gitwt.sh https://raw.githubusercontent.com/ashikahmad/gitwt/v0.2.0/gitwt.sh
+curl -fsSL -o ~/.config/gitwt/_gitwt   https://raw.githubusercontent.com/ashikahmad/gitwt/v0.2.0/_gitwt
 ```
 
-Then add to `~/.zshrc` or `~/.bashrc`:
+(`v0.2.0` is this version's tag; the one-line install uses the same files.) Then add to `~/.zshrc` or `~/.bashrc`:
 
 ```bash
 source "$HOME/.config/gitwt/gitwt.sh"
 source "$HOME/.config/gitwt/_gitwt"   # zsh only, after compinit
 ```
 
-**To update**, pull the clone and run `bash install.sh` again, or copy the two files again.
+**To update**, run the install command again. It replaces the two files and adds nothing twice. Files it left alone (links to another copy, or a git clone at `~/.config/gitwt`) are updated where they live, for example with `git -C ~/.config/gitwt pull`.
 
 **A shorter name:** `alias gwt=gitwt` in your shell config.
+
+### Uninstall
+
+There's no uninstaller yet. By hand:
+
+1. Delete the folder: `rm -r ~/.config/gitwt`
+2. In `~/.zshrc`, `~/.bashrc`, and on macOS `~/.bash_profile` (or `.bash_login` or `.profile`), delete the lines the installer added. Each comes after a `# gitwt — git worktree helper` comment:
+
+   ```bash
+   # gitwt — git worktree helper
+   source "$HOME/.config/gitwt/gitwt.sh"
+   ```
+
+3. Open a new terminal. Worktrees you made stay where they are; they're plain git worktrees, so `git worktree list` and `git worktree remove` still manage them.
 
 ---
 
@@ -477,7 +529,9 @@ Files gitwt reads:
 - for `move`: branches that have a worktree, except the main repo's, then folders for the second argument,
 - for `list`: `-l`, `--long`, `-s` and `--short`.
 
-Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command not found: compdef` at startup (TASK-014). bash has no completion yet.
+Source it after `compinit` in `~/.zshrc`; the installer adds it at the end, which is after `compinit` in most setups. A `.zshrc` the installer creates runs `compinit` first, and if an existing one doesn't seem to, the installer says how to turn it on. If `compinit` hasn't run yet when it loads (it comes later in `.zshrc`, or a plugin manager defers it), completion is turned on at the first prompt after `compinit` has run, rather than printing an error.
+
+**bash has no completion yet.** If you'd use it, 👍 [the bash completion issue](https://github.com/ashikahmad/gitwt/issues/11); the count decides whether it gets built.
 
 ---
 
@@ -519,7 +573,7 @@ Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command
 
 ## Known limitations
 
-**bash 3.2 isn't tested or officially supported.** That's the version macOS ships as `/bin/bash`. zsh 5.9 and bash 5.2 are tested.
+**bash 3.2 isn't supported.** That's the version macOS ships as `/bin/bash`; there, every `gitwt` command stops with a message saying so, rather than half-working. gitwt runs in zsh or bash 4 or newer, without changing your default shell; see [What's supported](#whats-supported).
 
 **A worktree whose path contains a newline** shows as `(stale)` in `gitwt ls`. Reading such paths needs `git worktree list -z`, which is git 2.36+; gitwt supports 2.18.
 
@@ -531,5 +585,4 @@ These are tracked on the [project board](https://ashikahmad.github.io/Kanban.md/
 | TASK-007 | Unknown flags and commands aren't rejected |
 | TASK-009 | After `--fetch` branches from the remote, the new branch tracks the base branch |
 | TASK-010 | `--from` accepts only local branches, not `origin/x`, tags or SHAs |
-| TASK-014 | Sourcing `_gitwt` before `compinit` prints an error at zsh startup |
 | TASK-020 | `switch` and `remove` can't target a detached worktree |

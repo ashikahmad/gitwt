@@ -109,4 +109,17 @@ _gitwt_complete_remove() {
   [[ "$used" != *"--branch"* ]] && compadd -- --branch
 }
 
-compdef _gitwt gitwt
+# compdef only exists once compinit has run. If it hasn't yet (this file sourced before
+# compinit, or compinit deferred by a plugin manager), register at the next prompt that
+# has it, instead of printing "command not found: compdef" at every shell start.
+if (( $+functions[compdef] )); then
+  compdef _gitwt gitwt
+else
+  _gitwt_register() {
+    (( $+functions[compdef] )) || return 0
+    compdef _gitwt gitwt
+    add-zsh-hook -d precmd _gitwt_register
+    unfunction _gitwt_register
+  }
+  autoload -Uz add-zsh-hook && add-zsh-hook precmd _gitwt_register
+fi
