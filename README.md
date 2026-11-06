@@ -6,6 +6,8 @@ A friendly shell wrapper around `git worktree` that makes working with multiple 
 
 Instead of remembering long `git worktree` paths and flags, `gitwt` gives you simple commands — create a new worktree and jump straight into it, switch between worktrees by branch name, and remove them cleanly.
 
+**Website and guide:** https://ashikahmad.github.io/gitwt/
+
 ---
 
 ## Why gitwt?
@@ -77,7 +79,7 @@ git config --global gitwt.path '~/worktrees/{repo}/{slug}'
 
 ## Documentation
 
-The **[usage guide](docs/usage.md)** covers every command and option, where worktrees go, setting up new worktrees, all settings, troubleshooting and known limitations. `gitwt help` prints a summary in the terminal.
+The **[usage guide](docs/usage.md)** ([on the website](https://ashikahmad.github.io/gitwt/docs/)) covers every command and option, where worktrees go, setting up new worktrees, all settings, troubleshooting and known limitations. `gitwt help` prints a summary in the terminal.
 
 ---
 

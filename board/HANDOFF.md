@@ -6,31 +6,24 @@ Written 2026-11-06, updated after PR #10 was merged, so the next session can car
 
 | | |
 |---|---|
-| `main` | `f4d1f40`, unchanged since the work began; far behind `dev`. Tag `v0.1.0` exists |
-| `dev` | PRs #1–#10 merged, plus board and docs commits |
+| Released | **v0.2.0** on `main` (`0e13fd4`, PR #6), tag `v0.2.0`, [GitHub release](https://github.com/ashikahmad/gitwt/releases/tag/v0.2.0) |
+| Site | https://ashikahmad.github.io/gitwt/ deployed from `main` by `.github/workflows/pages.yml` (first run succeeded) |
+| `dev` | `main` plus: README and `gitwt help` link the site; board updates. These reach `main` with the next release |
 | Open PRs | none |
-| Version | `0.2.0` on `dev`, not released or tagged yet |
-| Tests | 213 on `dev`, all pass on bash 5.2 (`./run_tests.sh`, ~4 min) |
-| Board on `dev` | 15 done; 13 backlog; in review: TASK-034 (website) and TASK-036 (one-line install), both waiting for the release |
-| Issues | [#11](https://github.com/ashikahmad/gitwt/issues/11) bash tab-completion, a `vote` issue (👍 counts decide; TASK-037) |
+| Tests | 213, all pass on bash 5.2 (`./run_tests.sh`, ~4 min) |
+| Issues | [#11](https://github.com/ashikahmad/gitwt/issues/11) bash tab-completion, a `vote` issue (TASK-037) |
 
-## Next step: release v0.2.0
+## Still to check from v0.2.0 (needs a browser outside the cloud session)
 
-1. **Owner:** Settings → Pages → Source: **GitHub Actions** (needed for the site workflow).
-2. Open a release PR `dev` → `main` with release notes. Call out:
-   - one-line install (`curl -fsSL …/main/install.sh | bash`), from the `v0.2.0` tag;
-   - `gitwt ls` no longer shows CHANGES without `-l` (`-l` adds it; `-s` is a bare list);
-   - `gitwt remove` refuses when it would lose uncommitted work or an edited listed file (`--force` overrides);
-   - `gitwt move`, `gitwt.path`, `.worktreeinclude` and the setup script;
-   - **bash 3.2 isn't supported:** every `gitwt` command there stops with a two-line message and a link; the installer asks before installing for a bash-older-than-4 login shell (with no terminal it installs nothing unless `GITWT_INSTALL_ANYWAY=1`).
-3. After merging, **tag `v0.2.0` on `main` and push the tag right away**: until it exists the one-liner gets a 404. Consider a GitHub release from it.
-4. Check:
-   - the Pages workflow run, `https://ashikahmad.github.io/gitwt/` and `/docs/`;
-   - the one-liner in a throwaway `HOME` (`HOME=$(mktemp -d) SHELL=/bin/zsh bash -c 'curl -fsSL …/main/install.sh | bash'`), ideally also on the owner's Mac;
-   - **the link in the bash 3.2 messages**, `https://ashikahmad.github.io/gitwt/docs/#whats-supported`, lands on "What's supported";
-   - the guide's external links to Homebrew's bash formula and Apple's "Use zsh as the default shell" page (those hosts aren't reachable from cloud sessions).
-5. Then: link the site from the README and `gitwt help` (help still links `docs/usage.md` on GitHub); move TASK-034 and TASK-036 to Done.
-6. Optionally delete the merged feature branches on GitHub.
+- The live site renders: `/` and `/docs/`, and `/docs/#whats-supported` (the link in the bash 3.2 messages) lands on that section. A local build has the anchor.
+- The guide's links to Homebrew's bash formula and Apple's "Use zsh as the default shell on your Mac" page work.
+
+Then move TASK-034 and TASK-036 to Done. Verified already: the release and tag point at `0e13fd4`; the real one-liner installed files identical to the tag, and zsh had gitwt and completion.
+
+## Notes for the next release
+
+- Release by PR `dev` → `main`, then tag `vX.Y.Z` on `main` at once (the one-liner downloads from the tag). Bump `GITWT_VERSION` in both `gitwt.sh` and `install.sh` first (a test keeps them equal), and the by-hand URLs in `docs/usage.md` (a test checks them).
+- **Cloud sessions can't push tags or create releases** (tag pushes are cut off; the GitHub tools only read releases). The owner publishes the release on GitHub with a new tag on `main`, which creates the tag; a draft doesn't create it.
 
 ## What's been done (merged into `dev`)
 
@@ -44,6 +37,7 @@ Written 2026-11-06, updated after PR #10 was merged, so the next session can car
 | #7 | `gitwt move` / `mv` | 003 |
 | #8 | Website: hand-written landing page + Just the Docs guide, Catppuccin Latte/Frappé, green accent; deploys from `main` | 034 (in review) |
 | #9 | `gitwt ls` instant by default (3 git commands), `-l` adds CHANGES, `-s` bare list | 033, 019 |
+| #6 | Release v0.2.0 (`dev` → `main`) | |
 | #10 | One-line install from the version tag; installer rewritten (two independent reviews, tested on macOS 26 with `/bin/bash` 3.2); bash 3.2 not-supported check in `gitwt`; "What's supported" and Uninstall in the guide | 036 (in review), 008, 014, 022 |
 
 Also on the board: 8 archived `#history` tasks (TASK-025–032) recording what existed before the board.
