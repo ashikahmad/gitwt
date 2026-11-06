@@ -2,7 +2,7 @@
 
 Everything gitwt does, how to use it, and what happens when something goes wrong. For a short overview, see the [README](../README.md).
 
-- [Install](#install)
+- [Install](#install): [what's supported](#whats-supported), [ways to install](#ways-to-install)
 - [Commands](#commands): [`new`](#gitwt-new), [`switch`](#gitwt-switch), [`remove`](#gitwt-remove), [`move`](#gitwt-move), [`list`](#gitwt-list), [`version` and `help`](#gitwt-version-and-gitwt-help)
 - [Where worktrees go](#where-worktrees-go)
 - [Setting up new worktrees](#setting-up-new-worktrees)
@@ -19,9 +19,19 @@ Everything gitwt does, how to use it, and what happens when something goes wrong
 
 gitwt is a shell function, so it has to be sourced into your shell rather than run as a program. That's what lets it `cd` you into a worktree.
 
-**Requirements:** git 2.18 or newer, and zsh or bash.
+### What's supported
 
-**Tested with** zsh 5.9 and bash 5.2. bash 3.2, the version macOS ships as `/bin/bash`, isn't tested or officially supported: gitwt may work there, but changes aren't checked against it. On macOS, the default shell is zsh, which is supported.
+| | Supported | Tested with | Not supported |
+|---|---|---|---|
+| **Systems** | macOS, Linux | Linux | Windows, except through WSL (untested) |
+| **Shells** | zsh; bash 4 or newer | zsh 5.9, bash 5.2 | bash 3.2, macOS's `/bin/bash`; fish and other shells |
+| **git** | 2.18 or newer | 2.43 | older |
+| **Tab-completion** | zsh | zsh 5.9 | bash (not yet) |
+| **Installer** | any bash, including macOS's 3.2, with `curl` or `wget` | bash 5.2 | sh, without bash |
+
+On macOS, zsh has been the default shell since macOS 10.15 (Catalina), so most Macs are ready. If your shell is still bash, check with `echo $BASH_VERSION`: macOS's own is 3.2, where `gitwt ls` fails and other commands are untested. The installer warns about this; switch to zsh with `chsh -s /bin/zsh` and run it again, or install a newer bash (`brew install bash`).
+
+### Ways to install
 
 **With one command:**
 
@@ -541,7 +551,7 @@ Source it after `compinit` in `~/.zshrc`; the installer adds it at the end, whic
 
 ## Known limitations
 
-**bash 3.2 isn't tested or officially supported.** That's the version macOS ships as `/bin/bash`. zsh 5.9 and bash 5.2 are tested.
+**bash 3.2 isn't supported.** That's the version macOS ships as `/bin/bash`; `gitwt ls` fails there, and other commands are untested. Use zsh, macOS's default shell, or bash 4 or newer. See [What's supported](#whats-supported).
 
 **A worktree whose path contains a newline** shows as `(stale)` in `gitwt ls`. Reading such paths needs `git worktree list -z`, which is git 2.36+; gitwt supports 2.18.
 
