@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 32 -->
+<!-- Config: Last Task ID: 33 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -433,3 +433,23 @@ Each feature PR documents itself in the README, so after TASK-004 and TASK-023 t
 - README.md
 - gitwt.sh (help text only)
 
+### TASK-033 | Add a quick gitwt ls that skips the expensive columns
+**Status**: backlog  
+**Priority**: Medium  
+**Category**: CLI  
+**Created**: 2026-11-06  
+**Tags**: #feature  
+
+`gitwt ls` is rich but slow with many worktrees or large ones. For each worktree it runs `git rev-list --count` twice (SYNC: ahead/behind upstream) and `git status --porcelain` (CHANGES), which scans every file in the worktree, untracked ones included. That's 3 git commands per worktree on top of one `git worktree list`. A quick version could show branch and path from that single `git worktree list --porcelain` call, plus detached and stale markers, which need no extra git commands.
+
+**Subtasks**:
+- [ ] Decide the interface: a flag such as `gitwt ls -s` / `--short`, or quick by default with a flag for the full table
+- [ ] Decide what the quick version shows: branch and path only, or also cheap extras such as the current worktree marker
+- [ ] Implement it with one git call in total
+- [ ] Time both versions on a repo with many worktrees, to confirm the difference
+- [ ] Add tests, zsh completion, help text and docs
+
+**Notes**:
+**Status**: noted for later discussion, 2026-11-06. Nothing decided yet.
+
+**Related**: TASK-019 covers `ls` column alignment and bare repo display, so the two could share work on the table layout.
