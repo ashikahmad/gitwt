@@ -1,0 +1,19 @@
+// Catppuccin Frappé (https://catppuccin.com/palette), for dark mode.
+$color-scheme: dark;
+$body-background-color: #303446;          // base
+$body-heading-color: #c6d0f5;             // text
+$body-text-color: #c6d0f5;                // text
+$link-color: #a6d189;                     // green
+$nav-child-link-color: #b5bfe2;           // subtext1
+$sidebar-color: #292c3c;                  // mantle
+$base-button-color: #414559;              // surface0
+$btn-primary-color: #a6d189;              // green
+$code-background-color: #292c3c;          // mantle
+$code-linenumber-color: #a5adce;          // subtext0
+$feedback-color: #232634;                 // crust
+$table-background-color: #303446;         // base
+$search-background-color: #292c3c;        // mantle
+$search-result-preview-color: #a5adce;    // subtext0
+$border-color: #414559;                   // surface0
+
+@import "./vendor/OneDarkJekyll/syntax";

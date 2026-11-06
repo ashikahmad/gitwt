@@ -1,0 +1,18 @@
+// Catppuccin Latte (https://catppuccin.com/palette), for light mode.
+$color-scheme: light;
+$body-background-color: #eff1f5;          // base
+$body-heading-color: #4c4f69;             // text
+$body-text-color: #4c4f69;                // text
+$link-color: #307820;                     // green, darkened from #40a02b to be readable on base
+$nav-child-link-color: #5c5f77;           // subtext1
+$sidebar-color: #e6e9ef;                  // mantle
+$base-button-color: #e6e9ef;              // mantle
+$btn-primary-color: #307820;              // green, darkened as above
+$code-background-color: #e6e9ef;          // mantle
+$feedback-color: #dce0e8;                 // crust
+$table-background-color: #eff1f5;         // base
+$search-background-color: #eff1f5;        // base
+$search-result-preview-color: #6c6f85;    // subtext0
+$border-color: #ccd0da;                   // surface0
+
+@import "./vendor/OneLightJekyll/syntax";

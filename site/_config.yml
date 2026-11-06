@@ -1,0 +1,25 @@
+title: gitwt
+description: A friendly shell wrapper around git worktree.
+url: https://ashikahmad.github.io
+baseurl: /gitwt
+theme: just-the-docs
+logo: /icon.svg
+favicon_ico: /icon.svg
+search_enabled: true
+heading_anchors: true
+color_scheme: latte
+aux_links:
+  GitHub: https://github.com/ashikahmad/gitwt
+  Project board: https://ashikahmad.github.io/Kanban.md/app/?board=https://github.com/ashikahmad/gitwt/blob/dev/board/kanban.md
+aux_links_new_tab: true
+back_to_top: true
+back_to_top_text: Back to top
+footer_content: 'gitwt is released under the MIT license. This guide is built from <a href="https://github.com/ashikahmad/gitwt/blob/main/docs/usage.md">docs/usage.md</a>.'
+plugins:
+  - jekyll-seo-tag
+exclude: [Gemfile, Gemfile.lock, prepare.sh, vendor]
+defaults:
+  - scope:
+      path: "docs"
+    values:
+      layout: default

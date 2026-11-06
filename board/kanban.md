@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 33 -->
+<!-- Config: Last Task ID: 34 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -453,3 +453,32 @@ Each feature PR documents itself in the README, so after TASK-004 and TASK-023 t
 **Status**: noted for later discussion, 2026-11-06. Nothing decided yet.
 
 **Related**: TASK-019 covers `ls` column alignment and bare repo display, so the two could share work on the table layout.
+
+### TASK-034 | Publish a website with a landing page and the usage guide
+**Status**: in-review  
+**Priority**: Medium  
+**Category**: Documentation  
+**Created**: 2026-11-06  
+**Started**: 2026-11-06  
+**Tags**: #docs  
+
+gitwt has no website. The README and usage guide are only readable on GitHub.
+
+**Subtasks**:
+- [x] A single-page landing at `/gitwt/`, written by hand, with real terminal output from gitwt
+- [x] The usage guide at `/gitwt/docs/` with Just the Docs, copied in from `docs/usage.md` at build time so it has one source
+- [x] Catppuccin Latte in light mode and Frappé in dark, following the system, with a green accent
+- [x] A GitHub Actions workflow that builds and deploys from `main`
+- [ ] Set Settings → Pages → Source to "GitHub Actions" (repo owner)
+- [ ] Release `dev` to `main`, then check the live site
+- [ ] Link the site from the README and `gitwt help` once it's live
+
+**Notes**:
+**Design**: the site is built from `main`, so it documents what people get when they install. `site/prepare.sh` copies `docs/usage.md` and `icon.svg` into the site and fixes the guide's link to the README. The landing page is separate copy, so update it with the README when a feature is added. Colours come from the Catppuccin palette, except the light-mode green: Latte's `#40a02b` is only 2.96:1 on its background, so links and buttons use `#307820`, darkened from it to 4.8:1. Frappé's green `#a6d189` is used as is.
+
+**Result**: built locally with Jekyll 4.4 and Just the Docs 0.10.1, and checked in Chromium at desktop and phone widths in both modes: links between the pages work, search works, nothing scrolls sideways. The workflow's steps were also run from a clean copy with the frozen `Gemfile.lock`. The workflow itself hasn't run on GitHub yet.
+
+**Modified files**:
+- site/ (new)
+- .github/workflows/pages.yml (new)
+
