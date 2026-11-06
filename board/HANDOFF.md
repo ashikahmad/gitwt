@@ -46,7 +46,7 @@ Also on the board: 8 archived `#history` tasks (TASK-025–032) recording what e
 
 Don't reopen these without a reason:
 
-- **Workflow:** feature branch → PR into `dev` → independent review by a separate agent given the code and spec, not conclusions → fix findings with tests that fail on the reviewed code → merge. Release by PR `dev` → `main`. Board-only and small docs changes go straight to `dev`. The owner asks for PRs and merges explicitly.
+- **Workflow:** feature branch → PR into `dev` → independent review by a separate agent given the code and spec, not conclusions → fix findings with tests that fail on the reviewed code → merge. Release by PR `dev` → `main`. Board-only and small docs changes go straight to `dev`. Site-only changes may go to `main` between releases so the site updates (the owner OK'd this for #12): merge into `dev`, merge `dev` into `main` (it has release merges `dev` lacks), push, then fast-forward `dev` to `main` so they stay identical. The installer downloads from the version tag, so `main` moving doesn't change what anyone installs. The owner asks for PRs and merges explicitly.
 - **Shells:** zsh and bash 4+ (tested: zsh 5.9, bash 5.2). bash 3.2 isn't officially supported (it lacks associative arrays, which `ls` uses). git 2.18+.
 - **`remove`:** no prompts, never writes to the main repo; refuses and prints `diff`/`cp` commands. Only files listed in the main repo's `.worktreeinclude` are checked; other ignored files are named in one line.
 - **`move`:** no `--force` (unlock locked worktrees explicitly); one generic note after every move about tools that saved the old full path, rather than detecting tools.
