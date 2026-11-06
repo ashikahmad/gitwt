@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 36 -->
+<!-- Config: Last Task ID: 37 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -580,4 +580,23 @@ Tests: 18 in `test/install.bats`, with a fake curl serving the repo's own files,
 - README.md
 - docs/usage.md
 - site/index.html
+
+**Reviews**: two independent reviews of PR #10, each finding fixed with a test that fails on the reviewed code. The first: a zsh user with only `.bashrc` got no zsh setup; a created `.zshrc` lacked `compinit`; links to another copy were overwritten; the existing-line check matched too much and too little; a cut-short download could exit 0 half done; plus nits and docs. The second: old `.zprofile` lines counted though completion never turned on; macOS bash login shells don't read `.bashrc`; piped, `BASH_SOURCE` can be `main`, so local files were installed unchecked; sourcing from zsh closed the shell; a dangling link broke the install; `.zshenv` output leaked into `ZDOTDIR`; quoted text passed for source lines; a deferred `compinit` lost completion (`_gitwt` now registers at the next prompt). Also: a clear warning when the login shell is bash 3.2, and a "What's supported" table in the guide, README and site. Install tests: 52; full suite 207/207.
+
+### TASK-037 | Add bash tab-completion, if people ask for it
+**Status**: backlog  
+**Priority**: Low  
+**Category**: Shell Integration  
+**Created**: 2026-11-06  
+**Tags**: #feature  
+
+Tab-completion is zsh only. Whether to build it for bash is decided by 👍 votes on [issue #11](https://github.com/ashikahmad/gitwt/issues/11), linked from the guide's support table and completion section and from the site.
+
+**Subtasks**:
+- [ ] Complete subcommands, flags, worktree branches (`sw`, `remove`, `move`) and branches for `new` and `--from`, with `complete -F`
+- [ ] Have the installer add it to `~/.bashrc`
+- [ ] Add tests and docs; update the support table
+
+**Notes**:
+**Design**: a GitHub issue with 👍 reactions measures demand; comments are for use cases. The `vote` label marks issues like this, so later "not yet" features can use the same pattern. Low counts early on mean "too early to tell", not "nobody needs it".
 

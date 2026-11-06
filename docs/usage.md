@@ -26,7 +26,7 @@ gitwt is a shell function, so it has to be sourced into your shell rather than r
 | **Systems** | macOS, Linux | Linux | Windows, except through WSL (untested) |
 | **Shells** | zsh; bash 4 or newer | zsh 5.9, bash 5.2 | bash 3.2, macOS's `/bin/bash`; fish and other shells |
 | **git** | 2.18 or newer | 2.43 | older |
-| **Tab-completion** | zsh | zsh 5.9 | bash (not yet) |
+| **Tab-completion** | zsh | zsh 5.9 | bash (not yet: [👍 the issue](https://github.com/ashikahmad/gitwt/issues/11) if you'd use it) |
 | **Installer** | any bash, including macOS's 3.2, with `curl` or `wget` | bash 5.2 | sh, without bash |
 
 On macOS, zsh has been the default shell since macOS 10.15 (Catalina), so most Macs are ready. If your shell is still bash, check with `echo $BASH_VERSION`: macOS's own is 3.2, where `gitwt ls` fails and other commands are untested. The installer warns about this; switch to zsh with `chsh -s /bin/zsh` and run it again, or install a newer bash (`brew install bash`).
@@ -509,7 +509,9 @@ Files gitwt reads:
 - for `move`: branches that have a worktree, except the main repo's, then folders for the second argument,
 - for `list`: `-l`, `--long`, `-s` and `--short`.
 
-Source it after `compinit` in `~/.zshrc`; the installer adds it at the end, which is after `compinit` in most setups. A `.zshrc` the installer creates runs `compinit` first, and if an existing one doesn't seem to, the installer says how to turn it on. If `compinit` hasn't run yet when it loads (it comes later in `.zshrc`, or a plugin manager defers it), completion is turned on at the first prompt after `compinit` has run, rather than printing an error. bash has no completion yet.
+Source it after `compinit` in `~/.zshrc`; the installer adds it at the end, which is after `compinit` in most setups. A `.zshrc` the installer creates runs `compinit` first, and if an existing one doesn't seem to, the installer says how to turn it on. If `compinit` hasn't run yet when it loads (it comes later in `.zshrc`, or a plugin manager defers it), completion is turned on at the first prompt after `compinit` has run, rather than printing an error.
+
+**bash has no completion yet.** If you'd use it, 👍 [the bash completion issue](https://github.com/ashikahmad/gitwt/issues/11); the count decides whether it gets built.
 
 ---
 
