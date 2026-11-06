@@ -75,11 +75,12 @@ When removal fails, gitwt.sh:244 suggests `git worktree remove --force` whatever
 **Plan**: done as part of TASK-001, which adds `gitwt remove --force` and rewrites this tip.
 
 ### TASK-003 | Add gitwt move to relocate or rename a worktree
-**Status**: in-review  
+**Status**: done  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
 **Started**: 2026-11-06  
+**Finished**: 2026-11-06  
 **Tags**: #feature  
 
 gitwt has no move or rename command. `git branch -m` works and `gitwt sw` still finds the branch, but the folder keeps the old name (`feature/new` stays in `feature-old`). `git worktree move` works and gitwt picks up the new path, but it has to be run by hand. Git cannot move the main worktree or one containing submodules.
