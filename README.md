@@ -29,6 +29,7 @@ With raw git you'd need to `git checkout develop && git pull && git checkout -b 
 - **`switch` / `sw`** — jump into any worktree by branch name
 - **`remove`** — tear down a worktree; auto-returns you to the main repo if you're inside it
 - **`list` / `ls`** — clean table of all worktrees with branch and relative path
+- **New worktree setup** — copy ignored files such as `.env` and run a setup script (your own, via `gitwt.postCreate`) automatically
 - **Zsh tab-completion** via the included `_gitwt` completion script
 
 ---
@@ -209,6 +210,59 @@ gitwt remove feature/dark-mode
 
 ---
 
+## New worktree setup
+
+New worktrees start without your ignored files and project setup. `gitwt new` can handle both, whether it creates a branch or attaches an existing one.
+
+### Copy ignored files: `.worktreeinclude`
+
+List the files to bring along in a `.worktreeinclude` at the root of the main repo, using gitignore syntax:
+
+```gitignore
+.env
+.env.local
+config/secrets.json
+```
+
+Files are copied from the main repo, even when you run `gitwt new` inside another worktree. A file is copied only if it matches this list **and** git ignores it, and anything already in the new worktree is left alone. If a listed file can't be copied, you get a warning, the worktree is kept, you're still moved into it, and `gitwt new` returns 1.
+
+### Run a setup script: `.gitwt/post-create`
+
+Commit an executable script at `.gitwt/post-create`, for example to install dependencies:
+
+```sh
+#!/bin/sh
+npm install
+```
+
+It runs inside the new worktree, after files are copied, with `GITWT_BRANCH`, `GITWT_WORKTREE` and `GITWT_MAIN_ROOT` set. The script is read from the new worktree, so the branch you create or attach needs to contain it.
+
+### Use your own script: `gitwt.postCreate`
+
+To have gitwt run a script you already use by hand, such as `scripts/setup.sh`, point to it in git config instead:
+
+```sh
+git config gitwt.postCreate scripts/setup.sh            # this repo
+git config --global gitwt.postCreate scripts/setup.sh   # every repo
+```
+
+The path is relative to the repo root and must stay inside it. When `gitwt.postCreate` is set, only that script runs and `.gitwt/post-create` is ignored. To turn setup off for a repo, even if it has `.gitwt/post-create`, set it to an empty value: `git config gitwt.postCreate ""`.
+
+If the configured file is missing, not executable or outside the repo, you get a warning, no script runs and `gitwt new` returns 1. gitwt does not fall back to `.gitwt/post-create`.
+
+The `GITWT_*` variables are only set when gitwt runs the script, so a script you also run by hand should work without them.
+
+### Approving the script
+
+Because the script comes from the repo, gitwt asks before running it. Your approval covers that exact version of the script and is stored in the repo's local git config, so a changed script asks again. Only one version is approved at a time, so branches with different versions of the script each ask again. Approval covers only the script file itself: if it runs other files from the repo, changes to those don't ask again, so review what it calls too. Without a terminal, an unapproved script is skipped with a note. If the script fails, you get a warning and the worktree is kept, you're still moved into it, and `gitwt new` returns 1.
+
+```sh
+git config gitwt.postCreateApproved "$(git hash-object --no-filters .gitwt/post-create)"  # approve without the prompt
+git config --unset gitwt.postCreateApproved                                              # revoke approval
+```
+
+---
+
 ## Zsh tab-completion
 
 The `_gitwt` completion script provides context-aware tab-completion:
@@ -237,6 +291,12 @@ Then use `gwt` everywhere instead — `gwt new feature/dark-mode`, `gwt sw main`
 
 - Git 2.5+ (worktree support)
 - bash or zsh
+
+---
+
+## Project board
+
+Planned work, bugs and ideas are tracked in [`board/kanban.md`](board/kanban.md), a [Kanban.md](https://github.com/ashikahmad/Kanban.md) board. You can also [view it as a board](https://ashikahmad.github.io/Kanban.md/app/?board=https://github.com/ashikahmad/gitwt/blob/dev/board/kanban.md), read-only, in any browser. It shows the `dev` branch, where work lands first.
 
 ---
 

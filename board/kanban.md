@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 23 -->
+<!-- Config: Last Task ID: 24 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -80,34 +80,52 @@ gitwt has no move or rename command. `git branch -m` works and `gitwt sw` still 
 - [ ] Add tests, zsh completion and docs
 
 ### TASK-004 | Automate new worktree setup with .worktreeinclude and a post-create hook
-**Status**: backlog  
+**Status**: done  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-05  
+**Finished**: 2026-11-06  
 **Tags**: #feature  
 
 gitwt has no setup step, so ignored files and project setup must be redone by hand in every new worktree. Git's `post-checkout` hook does fire on `gitwt new`, but it also fires on ordinary checkouts, and hooks in `.git/hooks` are not versioned or shared. Similar tools combine a list of ignored files to copy with post-create commands; `.worktreeinclude` is used by Claude Code, wt-cli and PostHog Code.
 
 **Subtasks**:
-- [ ] Put reading `.worktreeinclude` in a helper that TASK-001 can reuse
-- [ ] Copy files listed in `.worktreeinclude` (gitignore syntax) into new worktrees
-- [ ] Run an optional post-create script from the repo
-- [ ] Require approval or opt-in before running a repo-supplied script
-- [ ] Add tests and docs
+- [x] Put reading `.worktreeinclude` in a helper that TASK-001 can reuse
+- [x] Copy files listed in `.worktreeinclude` (gitignore syntax) into new worktrees
+- [x] Run an optional post-create script from the repo
+- [x] Require approval or opt-in before running a repo-supplied script
+- [x] Add tests and docs
 
 **Notes**:
+**Result**: `gitwt new` copies ignored files listed in the main repo's `.worktreeinclude` into the new worktree without overwriting anything, then runs `.gitwt/post-create` inside it. The script runs only once that exact version is approved; the approval is stored as a hash in `gitwt.postCreateApproved` in the repo's local git config. Without a terminal, an unapproved script is skipped with a note. `git config gitwt.postCreate <path>` (repo or global) runs that script instead, so a script people also run by hand, like `scripts/setup.sh`, can be used; only one script runs, an empty value turns setup off, and a configured script that is missing, not executable or outside the repo warns and returns 1 without falling back. A failing script or a file that cannot be copied gives a warning, keeps the worktree, still moves you into it, and returns 1. Added 22 tests; full suite 42/42 under bash 3.2 before the copy-failure fix and `gitwt.postCreate`, and 51/51 under bash 5.2 after them. Copying and the approval prompt were also run by hand under zsh and bash.
+
+**Modified files**:
+- gitwt.sh
+- README.md
+- test/setup.bats
+
 **Plan**: separate work that comes first, followed by TASK-001. The removal check itself belongs to TASK-001, not this task.
 
-**Shared with TASK-001**: the code that reads `.worktreeinclude` should be one helper, because TASK-001 uses the same list to decide which ignored files to protect on removal. Files copied in by this task are the ones it compares with the main repo's copy, so keep the copy step predictable.
+**Shared with TASK-001**: the code that reads `.worktreeinclude` is one helper, `_gitwt_included_files <dir>`, because TASK-001 uses the same list to decide which ignored files to protect on removal. Files copied in by this task are the ones it compares with the main repo's copy, so keep the copy step predictable.
 
 ### TASK-005 | Fix infinite loop when --from has no value
-**Status**: backlog  
+**Status**: done  
 **Priority**: High  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-05  
+**Finished**: 2026-11-06  
 **Tags**: #bug  
 
 `gitwt new foo --from` and `gitwt new --from` never finish, because `shift 2` fails without shifting (gitwt.sh:88). bash hangs silently; zsh prints `shift count must be <= $#` repeatedly (36 MB in 5 seconds). `--from=` does not hang.
+
+**Notes**:
+**Result**: `--from` with a missing, empty or flag-like value now prints an error and usage and returns 1 before creating anything. `--from=<base>` is normalised into the same check. Added 5 tests; full suite 34/34 under bash, and the error cases were also run by hand under zsh.
+
+**Modified files**:
+- gitwt.sh
+- test/new.bats
 
 ### TASK-006 | Warn when a branch already exists only on the remote
 **Status**: backlog  
@@ -322,3 +340,23 @@ New worktrees always went to `../worktrees/<repo>/<slug>`. The `gitwt.path` git 
 - test/test_helper.bash
 
 **Related**: TASK-003 covers moving existing worktrees. TASK-018 explains path collisions, which custom templates make easier to hit.
+
+### TASK-024 | Write a usage guide and trim the README
+**Status**: backlog  
+**Priority**: Medium  
+**Category**: Documentation  
+**Created**: 2026-11-06  
+**Tags**: #docs  
+
+Each feature PR documents itself in the README, so after TASK-004 and TASK-023 the README has grown one section at a time. Nothing covers how features combine, and the `gitwt.*` settings are documented in different places. A separate, to-the-point guide keeps the README short.
+
+**Subtasks**:
+- [ ] Write `docs/usage.md`, one section per command and feature: what it does, exact commands, and what happens on failure
+- [ ] Add one reference table of all `gitwt.*` settings (`gitwt.path`, `gitwt.postCreate`, `gitwt.postCreateApproved`): purpose, repo or global, default
+- [ ] Explain how custom paths, `.worktreeinclude` and the setup script work together, including worktrees inside the repo and symlinked paths (`GITWT_WORKTREE` holds the symlink path)
+- [ ] Add troubleshooting built from the actual messages, such as "not approved", "doesn't exist in the new worktree" and "could not copy"
+- [ ] Trim the README to an overview and quick start that link to the guide
+- [ ] Check that `gitwt help` matches the guide
+
+**Notes**:
+**Plan**: start after PR #3 (TASK-023, TASK-018) is merged into `dev`. If TASK-001 is close, wait for it too, since it changes what `gitwt remove` does with ignored files. Fold in or coordinate with TASK-017, which fixes specific README claims.
