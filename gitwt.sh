@@ -768,39 +768,54 @@ _gitwt_move() {
   echo "restarting: virtualenvs, build caches, absolute symlinks, or programs still running there."
 }
 
+# Rows are fields joined by the unit separator, a control character no real path contains,
+# so paths with tabs or spaces survive.
+_GITWT_US=$'\037'
+
 # Reads `git worktree list --porcelain` once into the caller's `rows` array and `main_root`.
-# Each row is "label<TAB>path<TAB>kind", kind being branch, detached, stale or bare.
+# Each row is label, path, kind (branch, detached, stale or bare), HEAD commit, and lock
+# state (`locked` or empty), joined by $_GITWT_US.
 _gitwt_read_worktrees() {
-  local line wt="" head="" branch="" kind=""
+  local line wt="" head="" branch="" kind="" locked="" us="$_GITWT_US"
   while IFS= read -r line; do
     case "$line" in
       "worktree "*) wt="${line#worktree }"; [[ -z "$main_root" ]] && main_root="$wt" ;;
       "HEAD "*)     head="${line#HEAD }" ;;
       "branch "*)   branch="${line#branch refs/heads/}" ;;
       "bare")       kind="bare" ;;
+      "locked"*)    locked="locked" ;;
       "")
         if [[ -n "$wt" ]]; then
-          if [[ ! -d "$wt" ]]; then rows+=("(stale)"$'\t'"$wt"$'\t'"stale")
-          elif [[ "$kind" == bare ]]; then rows+=("(bare)"$'\t'"$wt"$'\t'"bare")
-          elif [[ -n "$branch" ]]; then rows+=("$branch"$'\t'"$wt"$'\t'"branch")
-          else rows+=("(detached:${head:0:7})"$'\t'"$wt"$'\t'"detached")
+          if [[ ! -d "$wt" ]]; then rows+=("(stale)$us$wt${us}stale$us$head$us$locked")
+          elif [[ "$kind" == bare ]]; then rows+=("(bare)$us$wt${us}bare$us$us$locked")
+          elif [[ -n "$branch" ]]; then rows+=("$branch$us$wt${us}branch$us$head$us$locked")
+          else rows+=("(detached:${head:0:7})$us$wt${us}detached$us$head$us$locked")
           fi
         fi
-        wt=""; head=""; branch=""; kind="" ;;
+        wt=""; head=""; branch=""; kind=""; locked="" ;;
     esac
   done < <(git worktree list --porcelain 2>/dev/null)
+}
+
+# Sets the caller's `f_label`, `f_path`, `f_kind`, `f_head` and `f_locked` from a row.
+_gitwt_row_fields() {
+  local rest="$1" us="$_GITWT_US"
+  f_label="${rest%%"$us"*}"; rest="${rest#*"$us"}"
+  f_path="${rest%%"$us"*}";  rest="${rest#*"$us"}"
+  f_kind="${rest%%"$us"*}";  rest="${rest#*"$us"}"
+  f_head="${rest%%"$us"*}";  f_locked="${rest#*"$us"}"
 }
 
 # Sets the caller's `current` to the worktree you're in: the deepest one containing the
 # current folder. Sets a variable rather than printing, to avoid a subshell.
 _gitwt_current_worktree() {
-  local here="$PWD" here_physical entry wt
+  local here="$PWD" here_physical entry f_label f_path f_kind f_head f_locked
   current=""
   here_physical="$(pwd -P)"
   for entry in "$@"; do
-    wt="${entry#*$'\t'}"; wt="${wt%%$'\t'*}"
-    if [[ "$here" == "$wt" || "$here" == "$wt/"* || "$here_physical" == "$wt" || "$here_physical" == "$wt/"* ]]; then
-      (( ${#wt} > ${#current} )) && current="$wt"
+    _gitwt_row_fields "$entry"
+    if [[ "$here" == "$f_path" || "$here" == "$f_path/"* || "$here_physical" == "$f_path" || "$here_physical" == "$f_path/"* ]]; then
+      (( ${#f_path} > ${#current} )) && current="$f_path"
     fi
   done
   return 0
@@ -825,10 +840,18 @@ _gitwt_rule() {
   return 0
 }
 
-# `gitwt ls -s`: branch and path only, from a single `git worktree list` and no per-worktree
-# git commands, so it stays instant however many or large the worktrees are.
+# Sets the caller's `rel` to <path> relative to <parent>, when it's inside it.
+_gitwt_rel_path() {
+  rel="$1"
+  [[ "$1" == "$2/"* ]] && rel="${1#"$2/"}"
+  return 0
+}
+
+# `gitwt ls -s`: branch and path only, from a single `git worktree list` and no other git
+# commands, with no header, for scripts.
 _gitwt_list_short() {
-  local main_root="" entry label wt width=6 current rel mark padded
+  local main_root="" entry width=6 current rel mark padded stale=0
+  local f_label f_path f_kind f_head f_locked
   local -a rows
   rows=()
   _gitwt_read_worktrees
@@ -838,21 +861,18 @@ _gitwt_list_short() {
   fi
 
   for entry in "${rows[@]}"; do
-    label="${entry%%$'\t'*}"
-    (( ${#label} > width )) && width=${#label}
+    _gitwt_row_fields "$entry"
+    (( ${#f_label} > width )) && width=${#f_label}
   done
   _gitwt_current_worktree "${rows[@]}"
 
-  local parent="${main_root%/*}" stale=0
   for entry in "${rows[@]}"; do
-    label="${entry%%$'\t'*}"
-    wt="${entry#*$'\t'}"; wt="${wt%%$'\t'*}"
-    [[ "$entry" == *$'\t'stale ]] && stale=1
-    rel="$wt"
-    [[ "$wt" == "$parent/"* ]] && rel="${wt#"$parent/"}"
+    _gitwt_row_fields "$entry"
+    [[ "$f_kind" == stale ]] && stale=1
+    _gitwt_rel_path "$f_path" "${main_root%/*}"
     mark=" "
-    [[ "$wt" == "$current" ]] && mark="*"
-    _gitwt_pad "$label" "$width"
+    [[ "$f_path" == "$current" ]] && mark="*"
+    _gitwt_pad "$f_label" "$width"
     printf '%s %s  %s\n' "$mark" "$padded" "$rel"
   done
 
@@ -862,143 +882,220 @@ _gitwt_list_short() {
   fi
 }
 
-# Reads `git status --porcelain=v2 --branch` output and sets the caller's `sync` and `changes`.
-# Sets variables rather than printing, to avoid a subshell for every worktree.
-_gitwt_status_summary() {
-  local line ab="" staged=0 modified=0 untracked=0 xy
-  while IFS= read -r line; do
-    case "$line" in
-      "# branch.ab "*) ab="${line#\# branch.ab }" ;;
-      "1 "*|"2 "*)
-        xy="${line:2:2}"
-        [[ "${xy:0:1}" != "." ]] && staged=$((staged + 1))
-        [[ "${xy:1:1}" == "M" || "${xy:1:1}" == "D" ]] && modified=$((modified + 1)) ;;
-      "u "*) staged=$((staged + 1)) ;;
-      "? "*) untracked=$((untracked + 1)) ;;
-    esac
-  done
+# Runs `git status` in each worktree given as NUL-separated "path, row number" pairs on stdin,
+# up to 8 at a time, and prints one line per worktree: "<row> <staged> <modified> <untracked>
+# <conflicted>", or "<row> ?" if git status failed (a successful one always starts with a
+# "# branch.oid" line). Each line is written in one go, so lines from parallel runs don't mix,
+# and no temp files are needed. Counting is done by sh itself, to start fewer programs.
+_gitwt_status_counts() {
+  xargs -0 -n 2 -P 8 sh -c '
+    git -C "$1" status --porcelain=v2 --branch 2>/dev/null | {
+      ok=0 s=0 m=0 u=0 c=0
+      while IFS= read -r l; do
+        case "$l" in
+          "# branch.oid "*) ok=1 ;;
+          [12]" "*)
+            xy=${l#? }; x=${xy%"${xy#?}"}; y=${xy#?}; y=${y%"${y#?}"}
+            [ "$x" != . ] && s=$((s + 1))
+            case "$y" in M|D) m=$((m + 1)) ;; esac ;;
+          "u "*) c=$((c + 1)) ;;
+          "? "*) u=$((u + 1)) ;;
+        esac
+      done
+      if [ "$ok" = 1 ]; then echo "$2 $s $m $u $c"; else echo "$2 ?"; fi
+    }
+  ' sh
+}
 
-  sync="-"
-  if [[ -n "$ab" ]]; then
-    local ahead="${ab%% *}" behind="${ab##* }"
-    ahead="${ahead#+}"; behind="${behind#-}"
-    if (( ahead == 0 && behind == 0 )); then
-      sync="✓ clean"
-    else
-      sync=""
-      (( ahead  > 0 )) && sync="${sync:+$sync · }${ahead} ahead"
-      (( behind > 0 )) && sync="${sync:+$sync · }${behind} behind"
-    fi
-  fi
-
+# Sets the caller's `changes` from "<staged> <modified> <untracked> <conflicted>".
+_gitwt_changes_text() {
+  local staged="$1" modified="$2" untracked="$3" conflicted="$4"
   changes=""
-  (( staged    > 0 )) && changes="${changes:+$changes · }${staged} staged"
-  (( modified  > 0 )) && changes="${changes:+$changes · }${modified} modified"
-  (( untracked > 0 )) && changes="${changes:+$changes · }${untracked} untracked"
+  (( conflicted > 0 )) && changes="${conflicted} conflicted"
+  (( staged     > 0 )) && changes="${changes:+$changes · }${staged} staged"
+  (( modified   > 0 )) && changes="${changes:+$changes · }${modified} modified"
+  (( untracked  > 0 )) && changes="${changes:+$changes · }${untracked} untracked"
   [[ -z "$changes" ]] && changes="✓ clean"
   return 0
 }
 
-_gitwt_list() {
-  local short=0
-  while [[ $# -gt 0 ]]; do
-    case "$1" in
-      -s|--short) short=1 ; shift ;;
-      *)
-        echo "Error: unknown option '$1'. Usage: gitwt list [-s|--short]" >&2
-        return 1 ;;
-    esac
-  done
-  if (( short )); then
-    _gitwt_list_short
-    return
-  fi
-
-  local main_root="" entry label wt kind
-  local -a rows
-  rows=()
+# `gitwt ls` and `gitwt ls -l`. The default reads git's records only: one `git worktree list`,
+# one `git for-each-ref` for every branch's ahead/behind, and one `git log` for every
+# worktree's last commit, so it stays instant however many worktrees there are. `-l` adds
+# CHANGES, which needs a `git status` in each worktree and reads every file.
+_gitwt_list_table() {
+  local long="$1" us="$_GITWT_US"
+  local main_root="" entry current rel mark padded rule stale=0 n
+  local f_label f_path f_kind f_head f_locked c_s c_m c_u c_c
+  local -a rows heads
+  rows=(); heads=()
   _gitwt_read_worktrees
   if [[ -z "$main_root" ]]; then
     echo "Error: not inside a git repo." >&2
     return 1
   fi
 
-  # One `git status --porcelain=v2 --branch` per worktree gives both ahead/behind and changes.
-  # They run in parallel, at most 8 at a time, each writing to its own file to keep the order.
-  local tmp n=0
-  tmp="$(mktemp -d "${TMPDIR:-/tmp}/gitwt.XXXXXX")" || return 1
-  (
-    for entry in "${rows[@]}"; do
-      n=$((n + 1))
-      [[ "$entry" == *$'\t'branch || "$entry" == *$'\t'detached ]] || continue
-      wt="${entry#*$'\t'}"; wt="${wt%%$'\t'*}"
-      git -C "$wt" status --porcelain=v2 --branch > "$tmp/$n" 2>/dev/null &
-      (( n % 8 == 0 )) && wait
-    done
-    wait
-  )
+  # Ahead/behind for every branch at once, against the last fetch. Lookups use associative
+  # arrays: matching patterns against one long string is slow in zsh.
+  local line name upstream track
+  local -A tracks ages counts
+  while IFS= read -r line; do
+    tracks[${line%%"$us"*}]="${line#*"$us"}"
+  done < <(git for-each-ref --format="%(refname:short)$us%(upstream)$us%(upstream:track)" refs/heads 2>/dev/null)
 
-  # Each row becomes "label<TAB>path<TAB>kind<TAB>sync<TAB>changes"
+  # The last commit of every worktree at once
+  for entry in "${rows[@]}"; do
+    _gitwt_row_fields "$entry"
+    [[ -n "$f_head" && "$f_head" != 0000000000000000000000000000000000000000 ]] && heads+=("$f_head")
+  done
+  if (( ${#heads[@]} > 0 )); then
+    while IFS= read -r line; do
+      ages[${line%%"$us"*}]="${line#*"$us"}"
+    done < <(git log --no-walk --format="%H$us%cr" "${heads[@]}" 2>/dev/null)
+  fi
+
+  # CHANGES, for -l only
+  local scan=0
+  if (( long )); then
+    for entry in "${rows[@]}"; do
+      _gitwt_row_fields "$entry"
+      [[ "$f_kind" == branch || "$f_kind" == detached ]] && scan=1
+    done
+  fi
+  if (( scan )); then
+    # $(...), not < <(...): in interactive zsh a process substitution doesn't get Ctrl-C,
+    # so the git status runs would carry on in the background after you interrupt.
+    local raw
+    n=0
+    raw="$(
+      for entry in "${rows[@]}"; do
+        n=$((n + 1))
+        _gitwt_row_fields "$entry"
+        [[ "$f_kind" == branch || "$f_kind" == detached ]] && printf '%s\0%s\0' "$f_path" "$n"
+      done | _gitwt_status_counts
+    )" || return 130
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && counts[${line%% *}]="${line#* }"
+    done <<< "$raw"
+  fi
+
+  # Each row's cells: label, sync, changes, age, path, suffix
   local -a table
   table=()
-  local w_branch=6 w_sync=4 w_changes=7 sync changes
+  local w_branch=6 w_sync=4 w_changes=7 w_age=11 w_path=4 sync changes age suffix found ahead behind
+  _gitwt_current_worktree "${rows[@]}"
   n=0
   for entry in "${rows[@]}"; do
     n=$((n + 1))
-    label="${entry%%$'\t'*}"
-    kind="${entry##*$'\t'}"
-    sync="-"; changes="-"
-    if [[ -f "$tmp/$n" ]]; then
-      _gitwt_status_summary < "$tmp/$n"
-      [[ "$kind" == detached ]] && sync="-"
+    _gitwt_row_fields "$entry"
+    [[ "$f_kind" == stale ]] && stale=1
+
+    sync="-"
+    if [[ "$f_kind" == branch && -n "${tracks[$f_label]+x}" ]]; then
+      found="${tracks[$f_label]}"
+      upstream="${found%%"$us"*}"; track="${found#*"$us"}"
+      if [[ -n "$upstream" && "$track" != "[gone]" ]]; then
+        if [[ -z "$track" ]]; then
+          sync="✓ clean"
+        else
+          ahead=""; behind=""
+          [[ "$track" == *"ahead "* ]] && { ahead="${track#*ahead }"; ahead="${ahead%%[],]*}"; }
+          [[ "$track" == *"behind "* ]] && { behind="${track#*behind }"; behind="${behind%%[],]*}"; }
+          sync=""
+          [[ -n "$ahead" ]]  && sync="$ahead ahead"
+          [[ -n "$behind" ]] && sync="${sync:+$sync · }$behind behind"
+        fi
+      fi
     fi
-    table+=("$entry"$'\t'"$sync"$'\t'"$changes")
-    (( ${#label}   > w_branch  )) && w_branch=${#label}
+
+    age="-"
+    [[ -n "$f_head" && -n "${ages[$f_head]+x}" ]] && age="${ages[$f_head]}"
+
+    changes="-"
+    if (( long )) && [[ -n "${counts[$n]+x}" ]]; then
+      found="${counts[$n]}"
+      if [[ "$found" == "?" ]]; then
+        changes="?"
+      else
+        read -r c_s c_m c_u c_c <<< "$found"
+        _gitwt_changes_text "$c_s" "$c_m" "$c_u" "$c_c"
+      fi
+    fi
+
+    _gitwt_rel_path "$f_path" "${main_root%/*}"
+    suffix=""
+    [[ -n "$f_locked" ]] && suffix="   (locked)"
+    mark=" "
+    [[ "$f_path" == "$current" ]] && mark="*"
+
+    table+=("$mark$us$f_label$us$sync$us$changes$us$age$us$rel$us$suffix")
+    (( ${#f_label} > w_branch  )) && w_branch=${#f_label}
     (( ${#sync}    > w_sync    )) && w_sync=${#sync}
     (( ${#changes} > w_changes )) && w_changes=${#changes}
-  done
-  rm -rf "$tmp"
-
-  local current parent="${main_root%/*}" rel mark rest stale=0 w_path=4 padded rule
-  local c_branch c_sync c_changes r_branch r_sync r_changes
-  _gitwt_current_worktree "${rows[@]}"
-  for entry in "${rows[@]}"; do
-    wt="${entry#*$'\t'}"; wt="${wt%%$'\t'*}"
-    rel="$wt"
-    [[ "$wt" == "$parent/"* ]] && rel="${wt#"$parent/"}"
-    (( ${#rel} > w_path )) && w_path=${#rel}
+    (( ${#age}     > w_age     )) && w_age=${#age}
+    (( ${#rel}     > w_path    )) && w_path=${#rel}
   done
 
-  _gitwt_pad BRANCH "$w_branch";   c_branch="$padded"
-  _gitwt_pad SYNC "$w_sync";       c_sync="$padded"
-  _gitwt_pad CHANGES "$w_changes"; c_changes="$padded"
-  printf '  %s   %s   %s   %s\n' "$c_branch" "$c_sync" "$c_changes" "PATH"
+  local c_branch c_sync c_changes c_age r_branch r_sync r_changes r_age
+  _gitwt_pad BRANCH "$w_branch";       c_branch="$padded"
+  _gitwt_pad SYNC "$w_sync";           c_sync="$padded"
+  _gitwt_pad CHANGES "$w_changes";     c_changes="$padded"
+  _gitwt_pad "LAST COMMIT" "$w_age";   c_age="$padded"
   _gitwt_rule "$w_branch";  r_branch="$rule"
   _gitwt_rule "$w_sync";    r_sync="$rule"
   _gitwt_rule "$w_changes"; r_changes="$rule"
+  _gitwt_rule "$w_age";     r_age="$rule"
   _gitwt_rule "$w_path"
-  printf '  %s   %s   %s   %s\n' "$r_branch" "$r_sync" "$r_changes" "$rule"
+  if (( long )); then
+    printf '  %s   %s   %s   %s   %s\n' "$c_branch" "$c_sync" "$c_changes" "$c_age" "PATH"
+    printf '  %s   %s   %s   %s   %s\n' "$r_branch" "$r_sync" "$r_changes" "$r_age" "$rule"
+  else
+    printf '  %s   %s   %s   %s\n' "$c_branch" "$c_sync" "$c_age" "PATH"
+    printf '  %s   %s   %s   %s\n' "$r_branch" "$r_sync" "$r_age" "$rule"
+  fi
 
+  local rest
   for entry in "${table[@]}"; do
-    label="${entry%%$'\t'*}"; rest="${entry#*$'\t'}"
-    wt="${rest%%$'\t'*}";     rest="${rest#*$'\t'}"
-    kind="${rest%%$'\t'*}";   rest="${rest#*$'\t'}"
-    sync="${rest%%$'\t'*}";   changes="${rest#*$'\t'}"
-    [[ "$kind" == stale ]] && stale=1
-    rel="$wt"
-    [[ "$wt" == "$parent/"* ]] && rel="${wt#"$parent/"}"
-    mark=" "
-    [[ "$wt" == "$current" ]] && mark="*"
-    _gitwt_pad "$label" "$w_branch";     c_branch="$padded"
-    _gitwt_pad "$sync" "$w_sync";        c_sync="$padded"
-    _gitwt_pad "$changes" "$w_changes";  c_changes="$padded"
-    printf '%s %s   %s   %s   %s\n' "$mark" "$c_branch" "$c_sync" "$c_changes" "$rel"
+    rest="$entry"
+    mark="${rest%%"$us"*}";    rest="${rest#*"$us"}"
+    f_label="${rest%%"$us"*}"; rest="${rest#*"$us"}"
+    sync="${rest%%"$us"*}";    rest="${rest#*"$us"}"
+    changes="${rest%%"$us"*}"; rest="${rest#*"$us"}"
+    age="${rest%%"$us"*}";     rest="${rest#*"$us"}"
+    rel="${rest%%"$us"*}";     suffix="${rest#*"$us"}"
+    _gitwt_pad "$f_label" "$w_branch"; c_branch="$padded"
+    _gitwt_pad "$sync" "$w_sync";      c_sync="$padded"
+    _gitwt_pad "$age" "$w_age";        c_age="$padded"
+    if (( long )); then
+      _gitwt_pad "$changes" "$w_changes"; c_changes="$padded"
+      printf '%s %s   %s   %s   %s   %s%s\n' "$mark" "$c_branch" "$c_sync" "$c_changes" "$c_age" "$rel" "$suffix"
+    else
+      printf '%s %s   %s   %s   %s%s\n' "$mark" "$c_branch" "$c_sync" "$c_age" "$rel" "$suffix"
+    fi
   done
 
   if (( stale )); then
     echo ""
     echo "Tip: stale entries detected — run 'git worktree prune' to clean up."
   fi
+}
+
+_gitwt_list() {
+  local mode=default
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -s|--short) mode=short ; shift ;;
+      -l|--long)  mode=long ; shift ;;
+      *)
+        echo "Error: unknown option '$1'. Usage: gitwt list [-l|--long | -s|--short]" >&2
+        return 1 ;;
+    esac
+  done
+  case "$mode" in
+    short) _gitwt_list_short ;;
+    long)  _gitwt_list_table 1 ;;
+    *)     _gitwt_list_table 0 ;;
+  esac
 }
 
 _gitwt_help() {
@@ -1037,11 +1134,13 @@ COMMANDS
                               the branch (e.g. after 'git branch -m'). If you're inside,
                               you move with it. Alias: mv
 
-  list [-s|--short]           Show all worktrees with branch, sync state
-                              (ahead/behind upstream), changes, and path.
-                              -s, --short: branch and path only, instantly,
-                              with * on the worktree you're in.
-                              Alias: ls
+  list [-l | -s]              Show all worktrees with branch, ahead/behind upstream,
+                              last commit and path, instantly, with * on the one
+                              you're in. Alias: ls
+                              Flags:
+                                -l, --long      also count each worktree's changes
+                                                (reads every file, so slower)
+                                -s, --short     branch and path only, no header
 
   version                     Show the current gitwt version.
                               Also: gitwt --version, gitwt -v

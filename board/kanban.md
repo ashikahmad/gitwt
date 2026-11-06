@@ -437,7 +437,7 @@ Each feature PR documents itself in the README, so after TASK-004 and TASK-023 t
 - README.md
 - gitwt.sh (help text only)
 
-### TASK-033 | Add a quick gitwt ls that skips the expensive columns
+### TASK-033 | Make gitwt ls fast by default, with the expensive columns behind a flag
 **Status**: in-review  
 **Priority**: Medium  
 **Category**: CLI  
@@ -445,23 +445,27 @@ Each feature PR documents itself in the README, so after TASK-004 and TASK-023 t
 **Started**: 2026-11-06  
 **Tags**: #feature  
 
-`gitwt ls` is rich but slow with many worktrees or large ones. For each worktree it runs `git rev-list --count` twice (SYNC: ahead/behind upstream) and `git status --porcelain` (CHANGES), which scans every file in the worktree, untracked ones included. That's 3 git commands per worktree on top of `git worktree list`, which it runs twice.
+`gitwt ls` was rich but slow with many worktrees or large ones. For each worktree it ran `git rev-list --count` twice (SYNC) and `git status --porcelain` (CHANGES), which reads every file in the worktree. Its fixed-width columns also misaligned (TASK-019).
 
 **Subtasks**:
-- [x] Decide the interface: `gitwt ls -s` / `--short`; plain `gitwt ls` keeps the full table
-- [x] Decide what it shows: branch and path, `*` on the worktree you're in, detached and stale markers, no header
-- [x] Implement it with one git call in total
-- [x] Time both versions on a repo with many worktrees
+- [x] Decide the interface: `gitwt ls` instant by default, `-l` / `--long` adds CHANGES, `-s` / `--short` is a bare list for scripts
+- [x] Default: branch, ahead/behind, last commit age, path, locked marker, from three git commands in total
+- [x] `-l`: the same plus CHANGES, one `git status` per worktree, 8 at a time
+- [x] `-s`: branch and path from one git command, no header
+- [x] Time all three on a repo with many worktrees
+- [x] Fix the issues from the independent review of PR #9
 - [x] Add tests, zsh completion, help text and docs
 
 **Notes**:
-**Design**: a flag rather than a new default, so `gitwt ls` doesn't change for anyone. Like `git status -s`. No header, like `git branch`, so it's easy to use in scripts. The `*` goes on the deepest worktree containing the current folder, logical or physical path, so a worktree inside the main repo is marked instead of the main repo. Unknown options to `ls` are now an error.
+**Design**: what people usually want from `ls` is what exists and where to go, so the default reads only git's records: `git worktree list` (branch, path, detached, stale, bare, locked, commit), `git for-each-ref` with `%(upstream:track)` (ahead/behind for every branch at once, against the last fetch), and `git log --no-walk` (every worktree's last commit at once). Counting changes is the one thing that has to read every file, so it moved behind `-l`. `-s` stays as a bare list for scripts and for the `sw` picker (TASK-035). This changes what plain `gitwt ls` shows: CHANGES now needs `-l`.
 
-**Full table, also improved**: one `git status --porcelain=v2 --branch` per worktree instead of two `rev-list --count` and a `git status` (it reports ahead/behind too); these run in parallel, at most 8 at a time, each writing to its own temp file so the order is kept, in a subshell so interactive shells print no job messages; `git worktree list` is read once instead of twice; the helpers set variables instead of being called through `$(...)`, which had cost about a subshell per cell; columns size to their contents and pad by characters; `*` marks the worktree you're in. The values shown are unchanged: compared row by row against the old version on two test repos.
+**Implementation**: rows use the unit separator (`\037`) between fields, so paths with tabs work. Lookups use associative arrays, since matching patterns against one long string was slow in zsh (about 60 ms for 26 rows). `-l` runs `git status --porcelain=v2 --branch` through `xargs -0 -P 8`; each run counts in `sh` and prints one short line tagged with its row, so there are no temp files, the cap is exact, and a failed status (no `# branch.oid` line) shows `?`. It's read with `$(...)` rather than `< <(...)`, because in interactive zsh a process substitution doesn't get Ctrl-C and the runs carried on in the background. Conflicts get their own count. Padding counts characters, so `✓` and `·` line up in bash too.
 
-**Result**: on a repo with 26 worktrees of 3,000 files each, on 4 cores: `gitwt ls` went from 280–360 ms to 82–91 ms, and `gitwt ls -s` takes 8–10 ms, in both bash 5.2 and zsh 5.9. Tests check that `-s` runs exactly one git command, and that the full table runs one `worktree list` plus one `status` per worktree. Added 14 tests; full suite 142/142 on bash 5.2. Checked by hand in interactive zsh and bash, including completion.
+**Review of PR #9** (independent, before this rework): a tab in a path broke its row; Ctrl-C left a temp folder; the 8-at-a-time cap could be exceeded when the 8th row was stale or bare; an unusable `$TMPDIR` broke `ls`; conflicts were counted as staged; a failed status showed `✓ clean`; the `-s` docs example had the wrong spacing. All fixed, each with a test. Not fixed: zsh's `warn_nested_var` warns once per row, since the helpers set the caller's variables (rare option); the suite runs under bash only (TASK-015).
 
-**Related**: TASK-019 (alignment and bare repo display) is done with this.
+**Result**: on a repo with 26 worktrees of 3,000 files each, on 4 cores, bash 5.2 and zsh 5.9: `gitwt ls` 23–26 ms (was 280–360 ms with CHANGES), `gitwt ls -l` 92–103 ms, `gitwt ls -s` 13–17 ms. Tests check the git command counts (3 for the default, 3 plus one per worktree for `-l`, 1 for `-s`), at most 8 status runs at once (the test fails with the cap raised to 20), order past the batch of 8, tab paths, conflicts, failed status, locked, bare and an unusable `TMPDIR`. The list tests pass with `sh` as dash and as bash. Full suite 150/150. Ctrl-C during `-l` was checked in interactive zsh and bash: prompt back, no processes left.
+
+**Related**: TASK-019 (alignment, bare repo) is done with this. TASK-035 will use the `-s` list.
 
 **Modified files**:
 - gitwt.sh
