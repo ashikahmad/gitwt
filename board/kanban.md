@@ -246,13 +246,22 @@ Without `--recurse-submodules`, `test/libs/*` is empty and run_tests.sh fails wi
 - [ ] README.md:19: reword "no sibling folders", since `../worktrees` is one sibling folder; "outside your repo" is accurate
 
 ### TASK-018 | Explain worktree path collisions
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Low  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-05  
 **Tags**: #bug  
 
 `feature/a-b`, `feature-a/b`, `feature/a/b` and `feature-a-b` can coexist in git but all map to the slug `feature-a-b`. The second `gitwt new` fails with `worktree path already exists` and a `gitwt list` tip, without naming the collision or the branch that owns the path.
+
+**Notes**:
+**Result**: the error now says what is using the folder: a branch, a detached worktree, a checkout of another repo, or something that isn't a worktree. Each case gets its own tip. Done together with TASK-023, which makes these clashes easier to hit.
+
+**Modified files**:
+- gitwt.sh
+- README.md
+- test/path_config.bats
 
 ### TASK-019 | Fix gitwt list alignment and bare repo display
 **Status**: backlog  
@@ -306,6 +315,36 @@ Run from a clone in `~/.config/gitwt`, or with installed files symlinked to a re
 **Related**: TASK-008 covers a home with no shell config files. TASK-014 covers the `compdef` error from the source line.
 
 **Also noted, not in scope yet**: the installer's reinstall output shows no versions, and every version reports `0.1.0`. Source lines use an absolute home path rather than `$HOME`. There is no uninstall.
+
+### TASK-023 | Let users configure the worktree path
+**Status**: in-review  
+**Priority**: Medium  
+**Category**: CLI  
+**Created**: 2026-11-05  
+**Started**: 2026-11-05  
+**Tags**: #feature  
+
+New worktrees always went to `../worktrees/<repo>/<slug>`. The `gitwt.path` git config now takes a template with `{repo}`, `{slug}` and `{branch}`, and the old location stays the default.
+
+**Subtasks**:
+- [x] Resolve the template in `_gitwt_generate_path`
+- [x] Reject templates with no `{slug}` or `{branch}`, unknown placeholders, and shell variables such as `$HOME`
+- [x] Note when a worktree inside the repo isn't ignored
+- [x] Keep the developer's own git config out of the tests
+- [x] Add tests and update the README and `gitwt help`
+
+**Notes**:
+**Design**: git config rather than a dotfile or env var. It needs no parser, gives repo-over-global precedence and `includeIf`, and a cloned repo can't set it, so a repo can't choose where worktrees go on someone's machine.
+
+**Result**: `gitwt new` builds the path from `gitwt.path` and rejects templates it can't use before creating anything. `switch`, `remove` and `list` needed no changes, because they read registered paths from git.
+
+**Modified files**:
+- gitwt.sh
+- README.md
+- test/path_config.bats
+- test/test_helper.bash
+
+**Related**: TASK-003 covers moving existing worktrees. TASK-018 explains path collisions, which custom templates make easier to hit.
 
 ### TASK-024 | Write a usage guide and trim the README
 **Status**: backlog  

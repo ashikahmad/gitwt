@@ -7,6 +7,11 @@ setup_repo() {
   local _tmpdir
   _tmpdir="$(mktemp -d -t gitwt-test-XXXXX)"
   TEST_WORK_DIR="$(cd "$_tmpdir" && pwd -P)"
+  # Keep the developer's own git config (e.g. gitwt.path) out of the tests
+  export HOME="$TEST_WORK_DIR/home"
+  mkdir "$HOME"
+  unset XDG_CONFIG_HOME
+  export GIT_CONFIG_NOSYSTEM=1
   TEST_REPO="$TEST_WORK_DIR/myrepo"
   mkdir "$TEST_REPO"
   git -C "$TEST_REPO" init -b main

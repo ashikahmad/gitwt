@@ -25,27 +25,142 @@ _gitwt_main_repo_root() {
     | awk 'NR==1 { sub(/^worktree /, ""); print; exit }'
 }
 
-# Generates the conventional target path for new worktrees
+# Flattens a branch name into one folder name, e.g. fix/a/b → fix-a-b
+_gitwt_branch_slug() {
+  echo "${1//\//-}"
+}
+
+# Resolves ".", ".." and repeated or trailing slashes in an absolute path,
+# without touching the filesystem (the path usually doesn't exist yet)
+_gitwt_normalize_path() {
+  printf '%s\n' "$1" | awk '{
+    n = split($0, parts, "/")
+    depth = 0
+    for (i = 1; i <= n; i++) {
+      if (parts[i] == "" || parts[i] == ".") continue
+      if (parts[i] == "..") { if (depth > 0) depth--; continue }
+      stack[++depth] = parts[i]
+    }
+    out = ""
+    for (i = 1; i <= depth; i++) out = out "/" stack[i]
+    print (out == "" ? "/" : out)
+  }'
+}
+
+# Generates the target path for new worktrees from the `gitwt.path` git config
+# template, falling back to the default layout when it isn't set
 _gitwt_generate_path() {
   local branch="$1"   # e.g. fix/checkin-timeout-issue-103
 
   local main_root
   main_root="$(_gitwt_main_repo_root)" || { echo "Error: not inside a git repo." >&2; return 1; }
 
-  local repo_name
-  repo_name="$(basename "$main_root")"
-
-  local slug
-  if [[ "$branch" == */* ]]; then
-    local type rest
-    type="${branch%%/*}"
-    rest="${branch#*/}"
-    slug="${type}-${rest//\//-}"
-  else
-    slug="$branch"
+  # --type=path expands a leading ~; exit status 1 means the key isn't set
+  local template rc=0
+  template="$(git config --type=path --get gitwt.path 2>/dev/null)" || rc=$?
+  if (( rc == 1 )); then
+    template="../worktrees/{repo}/{slug}"
+  elif (( rc != 0 )); then
+    echo "Error: could not read gitwt.path. Check its value with: git config --get gitwt.path" >&2
+    return 1
   fi
 
-  echo "$(dirname "$main_root")/worktrees/${repo_name}/${slug}"
+  # Git doesn't expand shell variables, so '$HOME/wts' would become a folder named '$HOME'
+  if [[ "$template" == *'$'* ]]; then
+    echo "Error: gitwt.path can't use shell variables such as \$HOME: '$template'. Use ~ for your home folder, or write the full path." >&2
+    return 1
+  fi
+
+  if [[ "$template" != *\{slug\}* && "$template" != *\{branch\}* ]]; then
+    echo "Error: gitwt.path must contain {slug} or {branch}, otherwise every worktree gets the same path: '$template'" >&2
+    return 1
+  fi
+
+  local leftover="$template"
+  leftover=${leftover//\{repo\}/}
+  leftover=${leftover//\{slug\}/}
+  leftover=${leftover//\{branch\}/}
+  if [[ "$leftover" == *\{*\}* ]]; then
+    echo "Error: gitwt.path has an unknown placeholder: '$template'. Available: {repo}, {slug}, {branch}" >&2
+    return 1
+  fi
+
+  local repo_name slug
+  repo_name="$(basename "$main_root")"
+  slug="$(_gitwt_branch_slug "$branch")"
+
+  local resolved="$template"
+  resolved=${resolved//\{repo\}/"$repo_name"}
+  resolved=${resolved//\{slug\}/"$slug"}
+  resolved=${resolved//\{branch\}/"$branch"}
+
+  [[ "$resolved" == /* ]] || resolved="$main_root/$resolved"
+  _gitwt_normalize_path "$resolved"
+}
+
+# A worktree inside the main repo shows up there as untracked unless it's ignored
+_gitwt_note_if_untracked_in_repo() {
+  local worktree_path="$1"
+
+  local main_root
+  main_root="$(_gitwt_main_repo_root)"
+  [[ "$worktree_path" == "$main_root/"* ]] || return 0
+  git -C "$main_root" check-ignore -q "$worktree_path" && return 0
+
+  local rel="${worktree_path#"$main_root/"}"
+  echo "Note: $rel is inside the main repo and not ignored, so it shows as untracked there." >&2
+  echo "To hide it on this machine, run in the main repo: echo '${rel%%/*}/' >> .git/info/exclude" >&2
+}
+
+# Prints the branch checked out at a registered worktree path (empty if detached).
+# Returns 1 if this repo has no worktree at that path.
+_gitwt_worktree_owner() {
+  local target="$1" line wt=""
+
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*) wt="${line#worktree }" ;;
+      "branch "*)   [[ "$wt" == "$target" ]] && { echo "${line#branch refs/heads/}"; return 0; } ;;
+      "detached")   [[ "$wt" == "$target" ]] && return 0 ;;
+    esac
+  done < <(git worktree list --porcelain)
+
+  return 1
+}
+
+# Says what already occupies the path a new worktree needs
+_gitwt_explain_existing_path() {
+  local branch="$1" worktree_path="$2"
+
+  echo "Error: worktree path already exists: $worktree_path" >&2
+
+  # git records physical paths, and the configured path may go through a symlink
+  local physical owner
+  physical="$(cd "$worktree_path" && pwd -P)"
+
+  if owner="$(_gitwt_worktree_owner "$physical")"; then
+    if [[ -n "$owner" ]]; then
+      echo "It belongs to branch '$owner', and '$branch' maps to the same folder." >&2
+      echo "Tip: rename one of the branches, or keep slashes in folder names by using {branch} in gitwt.path." >&2
+    else
+      echo "It's a worktree with a detached HEAD, and '$branch' maps to the same folder." >&2
+      echo "Tip: remove it with 'git worktree remove $worktree_path', or rename '$branch'." >&2
+    fi
+    return 0
+  fi
+
+  if [[ -e "$worktree_path/.git" ]]; then
+    local other_repo
+    other_repo="$(cd "$worktree_path" && _gitwt_main_repo_root)"
+    if [[ -n "$other_repo" ]]; then
+      echo "It's a checkout of another repo: $other_repo" >&2
+      echo "Tip: repos with the same folder name, or a gitwt.path without {repo}, map to the same place. Set a different gitwt.path in one of them." >&2
+      return 0
+    fi
+  fi
+
+  echo "It isn't a worktree of this repo." >&2
+  echo "Tip: move it out of the way, or run 'gitwt list' to see all registered worktrees." >&2
 }
 
 # Used by `switch` and `remove` — looks up the actual registered path by branch name
@@ -179,6 +294,7 @@ _gitwt_finish_new() {
   local worktree="$1" branch="$2" main_root setup_status=0
   main_root="$(_gitwt_main_repo_root)"
 
+  _gitwt_note_if_untracked_in_repo "$worktree"
   _gitwt_copy_included "$main_root" "$worktree" || setup_status=1
   _gitwt_run_post_create "$worktree" "$branch" "$main_root" || setup_status=1
 
@@ -224,8 +340,7 @@ _gitwt_new() {
   worktree_path="$(_gitwt_generate_path "$branch")" || return 1
 
   if [[ -d "$worktree_path" ]]; then
-    echo "Error: worktree path already exists: $worktree_path" >&2
-    echo "Tip: run 'gitwt list' to see all registered worktrees." >&2
+    _gitwt_explain_existing_path "$branch" "$worktree_path"
     return 1
   fi
 
@@ -498,7 +613,7 @@ NEW WORKTREE SETUP
                               .gitwt/post-create. Set it to "" to turn setup off.
 
 WORKTREE PATH LAYOUT
-  New worktrees are placed at:
+  By default, new worktrees are placed at:
     ../worktrees/<repoName>/<type>-<branch-name>
 
   Examples:
@@ -507,6 +622,15 @@ WORKTREE PATH LAYOUT
 
     gitwt new feature/dark-mode
     → ../worktrees/awesomeRepo/feature-dark-mode
+
+  To change this, set the gitwt.path git config to a template:
+    git config --global gitwt.path '~/worktrees/{repo}/{slug}'   # all repos
+    git config gitwt.path '.worktrees/{slug}'                    # this repo only
+
+  Placeholders: {repo}, {slug} (feature-dark-mode), {branch} (feature/dark-mode).
+  Must include {slug} or {branch}. Relative paths start from the main repo root.
+  Use ~ for your home folder; shell variables such as $HOME aren't expanded.
+  Existing worktrees stay where they are.
 
 TYPICAL WORKFLOW
     gitwt ls                                        # see all worktrees
