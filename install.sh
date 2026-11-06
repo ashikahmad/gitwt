@@ -36,13 +36,16 @@ main() {
   RAW_URL="https://raw.githubusercontent.com/ashikahmad/gitwt/$ref"
   INSTALL_DIR="$HOME/.config/gitwt"
   FILES=(gitwt.sh _gitwt)
-  TMP_DIR="" LOCK_DIR="" PARTIAL=""
+  SUPPORT_URL="https://ashikahmad.github.io/gitwt/docs/#whats-supported"
+  TMP_DIR="" LOCK_DIR="" PARTIAL="" OLD_BASH=0
   trap cleanup EXIT
 
   setup_output
 
   bold "==> Installing gitwt"
   echo ""
+
+  confirm_shell
 
   find_source "$ref"
   mkdir -p "$INSTALL_DIR" || fail "could not create $INSTALL_DIR."
@@ -362,25 +365,37 @@ wire_bash() {
   fi
 }
 
-# gitwt needs zsh or bash 4 or newer. Only the login shell matters: on a Mac this script
-# itself always runs in /bin/bash 3.2, whatever shell the user has.
-check_bash_version() {
-  local darwin="$1" v
-  v="$("$SHELL" -c 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"' 2>/dev/null </dev/null || true)"
-  if [[ "$v" =~ ^[0-9]+\.[0-9]+$ ]] && (( ${v%%.*} < 4 )); then
-    yellow "Warning: your shell is bash $v, which gitwt doesn't support: it needs zsh, or bash 4"
-    yellow "or newer. In bash $v, gitwt stops with this message instead of running. Either:"
-    if (( darwin )); then
-      yellow "  - switch to zsh, macOS's default shell since 10.15:  chsh -s /bin/zsh"
-      yellow "    (then run this installer again, so ~/.zshrc loads gitwt), or"
-      yellow "  - install a newer bash, e.g. brew install bash, and make it your shell."
-    else
-      yellow "  - install zsh with your system's package manager and make it your shell"
-      yellow "    (chsh -s \"\$(command -v zsh)\"), then run this installer again, or"
-      yellow "  - install a newer bash the same way, and make it your shell."
-    fi
+# Before changing anything: if the login shell is a bash older than 4, which gitwt
+# doesn't support, say so and ask whether to install anyway (Enter means no). Only the
+# login shell matters: on a Mac this script itself always runs in /bin/bash 3.2,
+# whatever shell the user has. The answer is read from the terminal, since piped
+# through bash, this script's input is the script itself.
+confirm_shell() {
+  local shell="${SHELL:-}" v answer
+  [[ "${shell##*/}" == bash ]] || return 0
+  v="$("$shell" -c 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"' 2>/dev/null </dev/null || true)"
+  [[ "$v" =~ ^[0-9]+\.[0-9]+$ ]] && (( ${v%%.*} < 4 )) || return 0
+
+  OLD_BASH=1
+  yellow "Your shell is bash $v, which gitwt doesn't support. gitwt needs zsh, or bash 4"
+  yellow "or newer; it runs in them whenever they're installed, without changing your shell."
+  yellow "See $SUPPORT_URL"
+  echo ""
+  if [[ -n "${GITWT_INSTALL_ANYWAY:-}" ]]; then
+    echo "Installing anyway, since GITWT_INSTALL_ANYWAY is set."
     echo ""
+    return 0
   fi
+  if ! (: </dev/tty) 2>/dev/null; then
+    fail "there's no terminal to ask whether to install anyway, so nothing was installed. To install anyway, set GITWT_INSTALL_ANYWAY=1."
+  fi
+  printf 'Install anyway? [y/N] '
+  answer=""
+  read -r answer </dev/tty || true
+  case "$answer" in
+    [yY]|[yY][eE][sS]) echo "" ;;
+    *) echo "Cancelled. Nothing was installed."; exit 0 ;;
+  esac
 }
 
 # Wires up the login shell if it's zsh or bash, creating its config if missing, and
@@ -394,6 +409,8 @@ wire_shells() {
 
   shell="${SHELL:-}"; shell="${shell##*/}"
   if [[ -f "$zshrc" || "$shell" == zsh ]]; then WIRED_ZSHRC="$zshrc"; fi
+  # A bash too old for gitwt: set up zsh too, if it's installed, so typing zsh gives gitwt
+  if (( OLD_BASH )) && command -v zsh >/dev/null 2>&1; then WIRED_ZSHRC="$zshrc"; fi
   if [[ -f "$bashrc" || "$shell" == bash ]]; then WIRED_BASHRC="$bashrc"; fi
 
   if [[ -z "$WIRED_ZSHRC" && -z "$WIRED_BASHRC" ]]; then
@@ -410,7 +427,6 @@ wire_shells() {
     if (( darwin )) && [[ "$shell" == bash ]]; then wire_bash "$bashrc" 1; else wire_bash "$bashrc" 0; fi
   fi
   echo ""
-  if [[ "$shell" == bash ]]; then check_bash_version "$darwin"; fi
 }
 
 # ── done ───────────────────────────────────────────────────────────────────────

@@ -25,7 +25,7 @@ load 'test_helper'
 # its bash major version as 3.
 _as_bash3() {
   sed 's/BASH_VERSINFO\[0\]/3/' "$BATS_TEST_DIRNAME/../gitwt.sh" > "$BATS_TEST_TMPDIR/gitwt3.sh"
-  run bash -c "OSTYPE='${2:-linux-gnu}'; source '$BATS_TEST_TMPDIR/gitwt3.sh'; gitwt $1"
+  run bash -c "source '$BATS_TEST_TMPDIR/gitwt3.sh'; gitwt $1"
 }
 
 @test "bash older than 4: every command stops with the not-supported message" {
@@ -33,8 +33,9 @@ _as_bash3() {
   for cmd in ls "new x" "sw main" "remove x" "move x" version help ""; do
     _as_bash3 "$cmd"
     assert_failure 1
-    assert_output --partial "gitwt needs zsh, or bash 4 or newer"
-    assert_output --partial "#whats-supported"
+    assert_output --partial "gitwt doesn't support bash"
+    assert_output --partial "it needs zsh, or bash 4 or newer"
+    assert_output --partial "https://ashikahmad.github.io/gitwt/docs/#whats-supported"
   done
 }
 
@@ -42,27 +43,17 @@ _as_bash3() {
   _as_bash3 ls
   refute_output --partial "invalid option"
   refute_output --partial "BRANCH"
+  # Just the fact and the link: no advice to change shells
+  assert_equal "${#lines[@]}" "2"
 }
 
 @test "bash 4+ and zsh: no not-supported message" {
   run bash -c "source '$BATS_TEST_DIRNAME/../gitwt.sh'; gitwt version"
   assert_success
-  refute_output --partial "isn't supported"
+  refute_output --partial "doesn't support"
   if command -v zsh >/dev/null; then
     run zsh -f -c "source '$BATS_TEST_DIRNAME/../gitwt.sh'; gitwt version"
     assert_success
-    refute_output --partial "isn't supported"
+    refute_output --partial "doesn't support"
   fi
-}
-
-@test "bash older than 4: the advice fits the system" {
-  _as_bash3 ls linux-gnu
-  assert_output --partial "your system's package manager"
-  refute_output --partial "macOS"
-  refute_output --partial "brew"
-
-  _as_bash3 ls darwin25
-  assert_output --partial "chsh -s /bin/zsh"
-  assert_output --partial "brew install bash"
-  refute_output --partial "package manager"
 }

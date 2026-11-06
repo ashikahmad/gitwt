@@ -44,7 +44,7 @@ curl -fsSL https://raw.githubusercontent.com/ashikahmad/gitwt/main/install.sh | 
 
 Then open a new terminal. Run the same command again to update. To read the script before running it, or to install from a clone or by hand, see [Install](docs/usage.md#install).
 
-Works on macOS and Linux with zsh (macOS's default shell) or bash 4+, and git 2.18+. bash 3.2, macOS's own `/bin/bash`, isn't supported; the installer warns if that's your shell. See [What's supported](docs/usage.md#whats-supported).
+Works on macOS and Linux with zsh (macOS's default shell) or bash 4+, and git 2.18+. bash 3.2, macOS's own `/bin/bash`, isn't supported; the installer asks first if that's your shell. See [What's supported](docs/usage.md#whats-supported).
 
 ---
 

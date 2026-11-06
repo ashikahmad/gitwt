@@ -2,7 +2,7 @@
 
 Everything gitwt does, how to use it, and what happens when something goes wrong. For a short overview, see the [README](../README.md).
 
-- [Install](#install): [what's supported](#whats-supported), [ways to install](#ways-to-install)
+- [Install](#install): [what's supported](#whats-supported), [ways to install](#ways-to-install), [uninstall](#uninstall)
 - [Commands](#commands): [`new`](#gitwt-new), [`switch`](#gitwt-switch), [`remove`](#gitwt-remove), [`move`](#gitwt-move), [`list`](#gitwt-list), [`version` and `help`](#gitwt-version-and-gitwt-help)
 - [Where worktrees go](#where-worktrees-go)
 - [Setting up new worktrees](#setting-up-new-worktrees)
@@ -29,7 +29,13 @@ gitwt is a shell function, so it has to be sourced into your shell rather than r
 | **Tab-completion** | zsh | zsh 5.9 | bash (not yet: [👍 the issue](https://github.com/ashikahmad/gitwt/issues/11) if you'd use it) |
 | **Installer** | any bash, including macOS's 3.2, with `curl` or `wget` | bash 5.2; macOS's bash 3.2 | sh, without bash |
 
-On macOS, zsh has been the default shell since macOS 10.15 (Catalina), so most Macs are ready. If your shell is still bash, check with `echo $BASH_VERSION`: macOS's own is 3.2, where every `gitwt` command stops with a message saying it isn't supported. The installer warns about this too; switch to zsh with `chsh -s /bin/zsh` and run it again, or install a newer bash (`brew install bash`).
+**Which shell am I using?** `echo $SHELL` shows your default shell; in bash, `echo $BASH_VERSION` shows its version. On macOS, zsh has been the default since macOS 10.15 (Catalina), so most Macs are ready. macOS's own bash, `/bin/bash`, is 3.2: there every `gitwt` command stops with a message saying it isn't supported, and the installer asks before installing.
+
+**If your shell is bash 3.2,** you don't have to change it. Any of these works:
+
+- **Use gitwt from zsh, without changing your default shell.** zsh comes with macOS, and most Linux systems have a `zsh` package. Type `zsh` in a terminal when you want gitwt; `exit` takes you back. If zsh is installed, the installer sets up `~/.zshrc` for this too.
+- **Install a newer bash** alongside the old one: on macOS with [Homebrew's bash](https://formulae.brew.sh/formula/bash) (`brew install bash`), elsewhere with your system's package manager. Start it by name (`bash` once it's first in your `PATH`) when you want gitwt.
+- **Make either one your default shell,** if you'd like: `chsh -s <path to the shell>`, which must be listed in `/etc/shells`. Apple explains it for zsh in [Use zsh as the default shell on your Mac](https://support.apple.com/en-us/102360).
 
 ### Ways to install
 
@@ -45,7 +51,7 @@ The installer:
 
 - puts `gitwt.sh` and `_gitwt` in `~/.config/gitwt/`, downloaded from this version's release tag, so a version always installs the same files,
 - adds the lines that load them to the config of your login shell (`~/.zshrc` or `~/.bashrc`, created if missing), and of the other shell if its config exists. zsh also gets tab-completion; a `.zshrc` it creates turns on `compinit` for that. It respects `ZDOTDIR`, even when set in `~/.zshenv`,
-- for bash on macOS, whose terminals start login shells, also adds the line to `~/.bash_profile` (or `.bash_login` or `.profile`, whichever bash reads), unless that file already reads `~/.bashrc`. It warns if your bash is older than 4, which gitwt needs; macOS's own bash is 3.2,
+- for bash on macOS, whose terminals start login shells, also adds the line to `~/.bash_profile` (or `.bash_login` or `.profile`, whichever bash reads), unless that file already reads `~/.bashrc`. If your shell is a bash older than 4, it says gitwt doesn't support it and asks before changing anything (in a script, with no terminal to ask, it installs nothing unless `GITWT_INSTALL_ANYWAY=1` is set),
 - skips a line that's already there, written any common way (`~/`, `$HOME/`, the full path or `$XDG_CONFIG_HOME/`; `source` or `.`), but not one that's commented out or inside quotes. If an older install put the lines in `.zprofile`, it adds them to `.zshrc` too and says you can delete the old ones,
 - leaves alone installed files that are links to another copy, or part of a git clone at `~/.config/gitwt` (update those with `git pull`),
 - needs bash, and `curl` or `wget`, and checks that what it downloaded is really gitwt before installing anything.
@@ -83,6 +89,20 @@ source "$HOME/.config/gitwt/_gitwt"   # zsh only, after compinit
 **To update**, run the install command again. It replaces the two files and adds nothing twice. Files it left alone (links to another copy, or a git clone at `~/.config/gitwt`) are updated where they live, for example with `git -C ~/.config/gitwt pull`.
 
 **A shorter name:** `alias gwt=gitwt` in your shell config.
+
+### Uninstall
+
+There's no uninstaller yet. By hand:
+
+1. Delete the folder: `rm -r ~/.config/gitwt`
+2. In `~/.zshrc`, `~/.bashrc`, and on macOS `~/.bash_profile` (or `.bash_login` or `.profile`), delete the lines the installer added. Each comes after a `# gitwt — git worktree helper` comment:
+
+   ```bash
+   # gitwt — git worktree helper
+   source "$HOME/.config/gitwt/gitwt.sh"
+   ```
+
+3. Open a new terminal. Worktrees you made stay where they are; they're plain git worktrees, so `git worktree list` and `git worktree remove` still manage them.
 
 ---
 
@@ -553,7 +573,7 @@ Source it after `compinit` in `~/.zshrc`; the installer adds it at the end, whic
 
 ## Known limitations
 
-**bash 3.2 isn't supported.** That's the version macOS ships as `/bin/bash`; there, every `gitwt` command stops with a message saying so, rather than half-working. Use zsh, macOS's default shell, or bash 4 or newer. See [What's supported](#whats-supported).
+**bash 3.2 isn't supported.** That's the version macOS ships as `/bin/bash`; there, every `gitwt` command stops with a message saying so, rather than half-working. gitwt runs in zsh or bash 4 or newer, without changing your default shell; see [What's supported](#whats-supported).
 
 **A worktree whose path contains a newline** shows as `(stale)` in `gitwt ls`. Reading such paths needs `git worktree list -z`, which is git 2.36+; gitwt supports 2.18.
 

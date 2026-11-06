@@ -479,33 +479,81 @@ _on_macos() { printf '#!/bin/sh\necho Darwin\n' > "$T/bin/uname"; chmod +x "$T/b
   assert_output --partial "function"
 }
 
-@test "install: warns when the login shell is a bash older than 4" {
+# A fake login shell that reports bash 3.2.
+_old_bash() {
   mkdir -p "$T/oldbash"
   printf '#!/bin/sh\necho 3.2\n' > "$T/oldbash/bash"; chmod +x "$T/oldbash/bash"
-  SHELL="$T/oldbash/bash" install_piped
-  assert_success
-  assert_output --partial "Warning: your shell is bash 3.2, which gitwt doesn't support"
-  # Not a Mac here: no macOS or Homebrew advice
-  assert_output --partial "your system's package manager"
-  refute_output --partial "macOS"
-  refute_output --partial "brew"
-
-  _on_macos
-  SHELL="$T/oldbash/bash" install_piped
-  assert_success
-  assert_output --partial "chsh -s /bin/zsh"
-  assert_output --partial "brew install bash"
-  refute_output --partial "package manager"
 }
 
-@test "install: no bash version warning for a zsh user, or a bash 4+ user" {
-  : > "$HOME/.zshrc"; : > "$HOME/.bashrc"
-  install_piped
+# Pipes install.sh into bash with no terminal at all (as in CI), via setsid.
+install_no_tty() {
+  run env PATH="$T/bin:$PATH" "$@" setsid -w bash -c "cd '$T' && cat '$REPO_ROOT/install.sh' | bash" </dev/null
+}
+
+# Pipes install.sh into bash inside a terminal, with <answer> typed at the prompt.
+install_answering() {
+  local answer="$1"; shift
+  run bash -c "printf '%s\n' '$answer' | script -qec \"env PATH='$T/bin:$PATH' $* bash -c 'cd $T && cat $REPO_ROOT/install.sh | bash'\" /dev/null"
+}
+
+@test "install: bash 3.2 user, answering y, gets gitwt installed" {
+  command -v script >/dev/null || skip "script not installed"
+  _old_bash
+  install_answering y SHELL="$T/oldbash/bash"
+  assert_success
+  assert_output --partial "Your shell is bash 3.2, which gitwt doesn't support"
+  assert_output --partial "https://ashikahmad.github.io/gitwt/docs/#whats-supported"
+  assert_output --partial "Install anyway? [y/N]"
+  assert_output --partial "is installed"
+  grep -qxF 'source "$HOME/.config/gitwt/gitwt.sh"' "$HOME/.bashrc"
+  # zsh is installed, so typing zsh gives gitwt, even with no .zshrc before
+  if command -v zsh >/dev/null; then
+    grep -qxF 'source "$HOME/.config/gitwt/gitwt.sh"' "$HOME/.zshrc"
+    grep -qxF 'source "$HOME/.config/gitwt/_gitwt"' "$HOME/.zshrc"
+  fi
+}
+
+@test "install: bash 3.2 user, answering n or just Enter, gets nothing installed" {
+  command -v script >/dev/null || skip "script not installed"
+  _old_bash
+  local answer
+  for answer in n ""; do
+    install_answering "$answer" SHELL="$T/oldbash/bash"
+    assert_success
+    assert_output --partial "Cancelled. Nothing was installed."
+    refute_output --partial "is installed"
+    [[ ! -e "$HOME/.config/gitwt" && ! -e "$HOME/.bashrc" && ! -e "$HOME/.zshrc" ]]
+  done
+}
+
+@test "install: bash 3.2 user with no terminal gets nothing installed, and the way to override" {
+  _old_bash
+  install_no_tty SHELL="$T/oldbash/bash"
+  assert_failure 1
+  assert_output --partial "no terminal to ask"
+  assert_output --partial "GITWT_INSTALL_ANYWAY=1"
+  [[ ! -e "$HOME/.config/gitwt" && ! -e "$HOME/.bashrc" ]]
+  [[ ! -e "$T/urls" ]]   # asked before downloading anything
+}
+
+@test "install: GITWT_INSTALL_ANYWAY installs for a bash 3.2 user without asking" {
+  _old_bash
+  install_no_tty SHELL="$T/oldbash/bash" GITWT_INSTALL_ANYWAY=1
+  assert_success
+  assert_output --partial "Installing anyway"
+  refute_output --partial "Install anyway?"
+  grep -qxF 'source "$HOME/.config/gitwt/gitwt.sh"' "$HOME/.bashrc"
+}
+
+@test "install: zsh and bash 4+ users are never asked, even with no terminal" {
+  install_no_tty SHELL=/bin/zsh
   assert_success
   refute_output --partial "doesn't support"
-  SHELL="$(command -v bash)" install_piped
+  refute_output --partial "Install anyway"
+  install_no_tty SHELL="$(command -v bash)"
   assert_success
   refute_output --partial "doesn't support"
+  refute_output --partial "Install anyway"
 }
 
 @test "install: piped from a folder with files named main, gitwt.sh and _gitwt, still downloads" {

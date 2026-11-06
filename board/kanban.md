@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 37 -->
+<!-- Config: Last Task ID: 38 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -564,6 +564,7 @@ Switching needs the branch name typed out. `gitwt sw` with no branch only prints
 - [x] Show the one-liner on the website's landing page, Homebrew-style, and in the README, guide and `gitwt help`
 - [x] Add tests, without network access
 - [ ] At release: tag `v0.2.0`, then check the one-liner works
+- [ ] At release: open the link in gitwt's and the installer's bash 3.2 messages (the site's guide, `#whats-supported`), and the guide's links to Homebrew's bash and Apple's zsh page (not reachable from the cloud session)
 
 **Notes**:
 **Design**: running the same command again updates gitwt. Running `install.sh` from a clone works as before. The docs also show downloading `install.sh`, reading it, then running it, for people who'd rather not pipe a script into a shell. A Homebrew formula was considered and left for later: it needs a separate tap repository and people would still add the `source` lines themselves.
@@ -600,3 +601,20 @@ Tab-completion is zsh only. Whether to build it for bash is decided by 👍 vote
 **Notes**:
 **Design**: a GitHub issue with 👍 reactions measures demand; comments are for use cases. The `vote` label marks issues like this, so later "not yet" features can use the same pattern. Low counts early on mean "too early to tell", not "nobody needs it".
 
+### TASK-038 | Add an uninstaller
+**Status**: backlog  
+**Priority**: Low  
+**Category**: Install  
+**Created**: 2026-11-06  
+**Tags**: #feature  
+
+There's no way to uninstall except by hand (the guide's Uninstall section): delete `~/.config/gitwt` and the lines the installer added to shell config files.
+
+**Subtasks**:
+- [ ] `install.sh --uninstall` (also through the one-liner, e.g. `… | bash -s -- --uninstall`) deletes `~/.config/gitwt`
+- [ ] Remove exactly the lines the installer added (each follows a `# gitwt — git worktree helper` comment) from `.zshrc`, `.bashrc` and the bash login file; leave lines the user wrote, and say which
+- [ ] Show what it will change and ask first, like the bash 3.2 prompt; never touch worktrees
+- [ ] Add tests and docs; replace the guide's by-hand steps
+
+**Notes**:
+**Design**: edits users' shell config, so it deserves its own PR and review. Worktrees are plain git worktrees and stay.
