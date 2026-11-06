@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 22 -->
+<!-- Config: Last Task ID: 24 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -304,3 +304,23 @@ Run from a clone in `~/.config/gitwt`, or with installed files symlinked to a re
 **Related**: TASK-008 covers a home with no shell config files. TASK-014 covers the `compdef` error from the source line.
 
 **Also noted, not in scope yet**: the installer's reinstall output shows no versions, and every version reports `0.1.0`. Source lines use an absolute home path rather than `$HOME`. There is no uninstall.
+
+### TASK-024 | Write a usage guide and trim the README
+**Status**: backlog  
+**Priority**: Medium  
+**Category**: Documentation  
+**Created**: 2026-11-06  
+**Tags**: #docs  
+
+Each feature PR documents itself in the README, so after TASK-004 and TASK-023 the README has grown one section at a time. Nothing covers how features combine, and the `gitwt.*` settings are documented in different places. A separate, to-the-point guide keeps the README short.
+
+**Subtasks**:
+- [ ] Write `docs/usage.md`, one section per command and feature: what it does, exact commands, and what happens on failure
+- [ ] Add one reference table of all `gitwt.*` settings (`gitwt.path`, `gitwt.postCreate`, `gitwt.postCreateApproved`): purpose, repo or global, default
+- [ ] Explain how custom paths, `.worktreeinclude` and the setup script work together, including worktrees inside the repo and symlinked paths (`GITWT_WORKTREE` holds the symlink path)
+- [ ] Add troubleshooting built from the actual messages, such as "not approved", "doesn't exist in the new worktree" and "could not copy"
+- [ ] Trim the README to an overview and quick start that link to the guide
+- [ ] Check that `gitwt help` matches the guide
+
+**Notes**:
+**Plan**: start after PR #3 (TASK-023, TASK-018) is merged into `dev`. If TASK-001 is close, wait for it too, since it changes what `gitwt remove` does with ignored files. Fold in or coordinate with TASK-017, which fixes specific README claims.
