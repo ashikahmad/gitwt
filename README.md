@@ -193,7 +193,7 @@ List the files to bring along in a `.worktreeinclude` at the root of the main re
 config/secrets.json
 ```
 
-Files are copied from the main repo, even when you run `gitwt new` inside another worktree. A file is copied only if it matches this list **and** git ignores it, and anything already in the new worktree is left alone.
+Files are copied from the main repo, even when you run `gitwt new` inside another worktree. A file is copied only if it matches this list **and** git ignores it, and anything already in the new worktree is left alone. If a listed file can't be copied, you get a warning, the worktree is kept, you're still moved into it, and `gitwt new` returns 1.
 
 ### Run a setup script: `.gitwt/post-create`
 
@@ -206,7 +206,7 @@ npm install
 
 It runs inside the new worktree, after files are copied, with `GITWT_BRANCH`, `GITWT_WORKTREE` and `GITWT_MAIN_ROOT` set.
 
-Because the script comes from the repo, gitwt asks before running it. Your approval covers that exact version and is stored in the repo's local git config, so a changed script asks again. Without a terminal, an unapproved script is skipped with a note. If the script fails, you get a warning and the worktree is kept, you're still moved into it, and `gitwt new` returns 1.
+Because the script comes from the repo, gitwt asks before running it. Your approval covers that exact version of `.gitwt/post-create` and is stored in the repo's local git config, so a changed script asks again. It covers only that file: if the script runs other files from the repo, such as `./scripts/setup.sh`, changes to those don't ask again, so review what it calls too. Without a terminal, an unapproved script is skipped with a note. If the script fails, you get a warning and the worktree is kept, you're still moved into it, and `gitwt new` returns 1.
 
 ---
 

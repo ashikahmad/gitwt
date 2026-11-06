@@ -87,6 +87,7 @@ _gitwt_included_files() {
 }
 
 # Copies the included files from <source> to <dest>. Anything already at <dest> is left alone.
+# Returns non-zero if any file could not be copied.
 _gitwt_copy_included() {
   local source_dir="$1" dest_dir="$2" file copied=0 skipped=0 failed=0
 
@@ -103,6 +104,10 @@ _gitwt_copy_included() {
 
   (( copied > 0 ))  && echo "Copied $copied file(s) listed in .worktreeinclude."
   (( skipped > 0 )) && echo "Skipped $skipped listed file(s) already there."
+  if (( failed > 0 )); then
+    echo "Warning: could not copy $failed file(s) listed in .worktreeinclude. The worktree was still created." >&2
+    return 1
+  fi
   return 0
 }
 
@@ -147,7 +152,7 @@ _gitwt_finish_new() {
   local worktree="$1" branch="$2" main_root setup_status=0
   main_root="$(_gitwt_main_repo_root)"
 
-  _gitwt_copy_included "$main_root" "$worktree"
+  _gitwt_copy_included "$main_root" "$worktree" || setup_status=1
   _gitwt_run_post_create "$worktree" "$branch" "$main_root" || setup_status=1
 
   echo "Done! Switching into it now..."

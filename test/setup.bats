@@ -110,6 +110,22 @@ approve_hook() {
   assert_equal "$(cat "$WT/.env")" "FROM_BRANCH"
 }
 
+@test "include: a failed copy warns, keeps the worktree, cd's in and returns 1" {
+  ignore_and_include .env "config/*.json"
+  git switch -qc feat
+  echo "not a folder" > config
+  git add config; git commit -qm "config is a file on this branch"
+  git switch -q main
+  echo a > .env
+  mkdir config; echo '{}' > config/local.json
+  run "$GITWT_RUNNER" new feat </dev/null
+  assert_failure 1
+  assert_output --partial "could not copy 'config/local.json'"
+  assert_output --partial "could not copy 1 file(s)"
+  assert_output --partial "Copied 1 file(s)"
+  assert_output --partial "__PWD__:$WT"
+}
+
 # ── post-create hook ───────────────────────────────────────────────────────────
 
 @test "hook: unapproved script does not run without a terminal" {

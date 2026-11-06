@@ -97,7 +97,7 @@ gitwt has no setup step, so ignored files and project setup must be redone by ha
 - [x] Add tests and docs
 
 **Notes**:
-**Result**: `gitwt new` copies ignored files listed in the main repo's `.worktreeinclude` into the new worktree without overwriting anything, then runs `.gitwt/post-create` inside it. The script runs only once that exact version is approved; the approval is stored as a hash in `gitwt.postCreateApproved` in the repo's local git config. Without a terminal, an unapproved script is skipped with a note. A failing script gives a warning, keeps the worktree, still moves you into it, and returns 1. Added 13 tests; full suite 42/42 under bash 3.2, and 47/47 combined with the TASK-005 fix. Copying and the approval prompt were also run by hand under zsh and bash.
+**Result**: `gitwt new` copies ignored files listed in the main repo's `.worktreeinclude` into the new worktree without overwriting anything, then runs `.gitwt/post-create` inside it. The script runs only once that exact version is approved; the approval is stored as a hash in `gitwt.postCreateApproved` in the repo's local git config. Without a terminal, an unapproved script is skipped with a note. A failing script or a file that cannot be copied gives a warning, keeps the worktree, still moves you into it, and returns 1. Added 14 tests; full suite 43/43 under bash 3.2 and bash 5.2. Copying and the approval prompt were also run by hand under zsh and bash.
 
 **Modified files**:
 - gitwt.sh
