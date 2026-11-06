@@ -34,6 +34,8 @@ _gitwt() {
         new)       _gitwt_complete_new ;;
         switch|sw) _gitwt_complete_worktree_branches ;;
         remove)    _gitwt_complete_remove ;;
+        list|ls)
+          (( CURRENT == 3 )) && compadd -- -l --long -s --short ;;
         move|mv)
           if (( CURRENT == 3 )); then _gitwt_complete_movable_branches
           elif (( CURRENT == 4 )); then _files -/

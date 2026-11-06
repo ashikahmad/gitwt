@@ -321,13 +321,17 @@ Without `--recurse-submodules`, `test/libs/*` is empty and run_tests.sh fails wi
 - test/path_config.bats
 
 ### TASK-019 | Fix gitwt list alignment and bare repo display
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Low  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-06  
 **Tags**: #bug  
 
 Under bash 3.2, printf pads by bytes, so `✓`, `·` and `─` misalign rows (PATH starts at column 93-99; always 99 under zsh in a UTF-8 locale, while `LC_ALL=C` zsh misaligns too). Both shells shift when CHANGES exceeds 30 characters. A bare repo's entry shows as `(detached:)` with `✓ clean`. Newer bash versions were not tested.
+
+**Notes**:
+**Result**: done with TASK-033. Columns now size to their contents, so a long CHANGES value no longer shifts PATH. Padding counts characters rather than bytes, so `✓`, `·` and `─` line up in bash as well as zsh, in any UTF-8 locale; with `LC_ALL=C` a shell can't count them as characters, so rows with `✓` can still be off by 2 there. A bare repo shows as `(bare)` with `-` for SYNC and CHANGES, and no `git status` is run for it. bash 5.2 and zsh 5.9 were checked; bash 3.2 isn't supported (see TASK-015).
 
 ### TASK-020 | Let switch and remove target detached worktrees
 **Status**: backlog  
@@ -433,26 +437,45 @@ Each feature PR documents itself in the README, so after TASK-004 and TASK-023 t
 - README.md
 - gitwt.sh (help text only)
 
-### TASK-033 | Add a quick gitwt ls that skips the expensive columns
-**Status**: backlog  
+### TASK-033 | Make gitwt ls fast by default, with the expensive columns behind a flag
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-06  
+**Started**: 2026-11-06  
 **Tags**: #feature  
 
-`gitwt ls` is rich but slow with many worktrees or large ones. For each worktree it runs `git rev-list --count` twice (SYNC: ahead/behind upstream) and `git status --porcelain` (CHANGES), which scans every file in the worktree, untracked ones included. That's 3 git commands per worktree on top of one `git worktree list`. A quick version could show branch and path from that single `git worktree list --porcelain` call, plus detached and stale markers, which need no extra git commands.
+`gitwt ls` was rich but slow with many worktrees or large ones. For each worktree it ran `git rev-list --count` twice (SYNC) and `git status --porcelain` (CHANGES), which reads every file in the worktree. Its fixed-width columns also misaligned (TASK-019).
 
 **Subtasks**:
-- [ ] Decide the interface: a flag such as `gitwt ls -s` / `--short`, or quick by default with a flag for the full table
-- [ ] Decide what the quick version shows: branch and path only, or also cheap extras such as the current worktree marker
-- [ ] Implement it with one git call in total
-- [ ] Time both versions on a repo with many worktrees, to confirm the difference
-- [ ] Add tests, zsh completion, help text and docs
+- [x] Decide the interface: `gitwt ls` instant by default, `-l` / `--long` adds CHANGES, `-s` / `--short` is a bare list for scripts
+- [x] Default: branch, ahead/behind, last commit age, path, locked marker, from three git commands in total
+- [x] `-l`: the same plus CHANGES, one `git status` per worktree, 8 at a time
+- [x] `-s`: branch and path from one git command, no header
+- [x] Time all three on a repo with many worktrees
+- [x] Fix the issues from the independent review of PR #9
+- [x] Add tests, zsh completion, help text and docs
 
 **Notes**:
-**Status**: noted for later discussion, 2026-11-06. Nothing decided yet.
+**Design**: what people usually want from `ls` is what exists and where to go, so the default reads only git's records: `git worktree list` (branch, path, detached, stale, bare, locked, commit), `git for-each-ref` with `%(upstream:track)` (ahead/behind for every branch at once, against the last fetch), and `git log --no-walk` (every worktree's last commit at once). Counting changes is the one thing that has to read every file, so it moved behind `-l`. `-s` stays as a bare list for scripts and for the `sw` picker (TASK-035). This changes what plain `gitwt ls` shows: CHANGES now needs `-l`.
 
-**Related**: TASK-019 covers `ls` column alignment and bare repo display, so the two could share work on the table layout.
+**Implementation**: rows use the unit separator (`\037`) between fields, so paths with tabs work. Lookups use associative arrays, since matching patterns against one long string was slow in zsh (about 60 ms for 26 rows). `-l` runs `git status --porcelain=v2 --branch` through `xargs -0 -P 8`; each run counts in `sh` and prints one short line tagged with its row, so there are no temp files, the cap is exact, and a failed status (no `# branch.oid` line) shows `?`. It's read with `$(...)` rather than `< <(...)`, because in interactive zsh a process substitution doesn't get Ctrl-C and the runs carried on in the background. Conflicts get their own count. Padding counts characters, so `✓` and `·` line up in bash too.
+
+**Review of PR #9** (independent, before this rework): a tab in a path broke its row; Ctrl-C left a temp folder; the 8-at-a-time cap could be exceeded when the 8th row was stale or bare; an unusable `$TMPDIR` broke `ls`; conflicts were counted as staged; a failed status showed `✓ clean`; the `-s` docs example had the wrong spacing. All fixed, each with a test. **Second review** (independent, of the reworked version): SYNC showed `-` for a branch with a tag of the same name (`refname:short` gives `heads/<name>`; now `refname:lstrip=2`); with `pipefail` on, `ls -l` printed nothing when the last worktree was stale or bare (the loop ended in a failed `&&`; now an `if`, and failures are no longer treated as Ctrl-C); one commit git couldn't find, or a SHA-256 branch with no commits, blanked LAST COMMIT on every row (now `--ignore-missing`, and any all-zero ID is skipped); the guide's completion line missed `-l`. All fixed with tests that fail on the reviewed code. Also, as decided: ahead/behind is looked up only for the worktrees' branches, so a repo with many other branches stays fast. The UTF-8 limit on alignment and the newline-in-path limit (needs git 2.36's `-z`) are documented.
+
+Not fixed: zsh's `warn_nested_var` warns once per row, since the helpers set the caller's variables (rare option); the suite runs under bash only (TASK-015).
+
+**Result**: on a repo with 26 worktrees of 3,000 files each, on 4 cores, bash 5.2 and zsh 5.9: `gitwt ls` 23–26 ms (was 280–360 ms with CHANGES), `gitwt ls -l` 92–103 ms, `gitwt ls -s` 13–17 ms. Tests check the git command counts (3 for the default, 3 plus one per worktree for `-l`, 1 for `-s`), at most 8 status runs at once (the test fails with the cap raised to 20), order past the batch of 8, tab paths, conflicts, failed status, locked, bare and an unusable `TMPDIR`. The list tests pass with `sh` as dash and as bash. Full suite 155/155. Ctrl-C during `-l` was checked in interactive zsh and bash: prompt back, no processes left.
+
+**Related**: TASK-019 (alignment, bare repo) is done with this. TASK-035 will use the `-s` list.
+
+**Modified files**:
+- gitwt.sh
+- _gitwt
+- test/list.bats
+- docs/usage.md
+- README.md
+- site/index.html
 
 ### TASK-034 | Publish a website with a landing page and the usage guide
 **Status**: in-review  

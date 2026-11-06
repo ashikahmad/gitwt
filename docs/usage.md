@@ -186,29 +186,57 @@ restarting: virtualenvs, build caches, absolute symlinks, or programs still runn
 ### `gitwt list`
 
 ```text
-gitwt list                 # alias: gitwt ls
+gitwt list [-l|--long | -s|--short]    # alias: gitwt ls
 ```
 
-Shows every worktree of the repo (columns narrowed here):
+Shows every worktree of the repo, with `*` on the one you're in. It's instant, however many worktrees there are:
 
 ```text
-BRANCH               SYNC                 CHANGES                    PATH
-───────────────────  ───────────────────  ─────────────────────────  ──────────────────────────────────
-main                 ✓ clean              ✓ clean                    myrepo
-feature/dark-mode    -                    2 modified · 1 untracked   worktrees/myrepo/feature-dark-mode
-fix/login-bug        3 ahead              ✓ clean                    worktrees/myrepo/fix-login-bug
-fix/auth             1 ahead · 2 behind   2 modified                 worktrees/myrepo/fix-auth
-(detached:abc1234)   -                    1 staged                   worktrees/myrepo/some-worktree
+$ gitwt ls
+  BRANCH               SYNC       LAST COMMIT      PATH
+  ──────────────────   ────────   ──────────────   ─────────────────────────────────
+  main                 1 behind   49 minutes ago   myapp
+  feature/dark-mode    1 ahead    49 minutes ago   worktrees/myapp/feature-dark-mode
+* feature/search       -          49 minutes ago   worktrees/myapp/feature-search
+  fix/login-timeout    2 ahead    49 minutes ago   worktrees/myapp/fix-login-timeout   (locked)
+  (detached:ec13cda)   -          49 minutes ago   worktrees/myapp/review
+```
+
+`-l` / `--long` adds what's changed in each worktree:
+
+```text
+$ gitwt ls -l
+  BRANCH               SYNC       CHANGES                               LAST COMMIT      PATH
+  ──────────────────   ────────   ───────────────────────────────────   ──────────────   ─────────────────────────────────
+  main                 1 behind   ✓ clean                               49 minutes ago   myapp
+  feature/dark-mode    1 ahead    1 modified · 1 untracked              49 minutes ago   worktrees/myapp/feature-dark-mode
+* feature/search       -          1 staged · 1 modified · 3 untracked   49 minutes ago   worktrees/myapp/feature-search
+  fix/login-timeout    2 ahead    1 staged                              49 minutes ago   worktrees/myapp/fix-login-timeout   (locked)
+  (detached:ec13cda)   -          ✓ clean                               49 minutes ago   worktrees/myapp/review
 ```
 
 | Column | Shows |
 |---|---|
-| BRANCH | The branch, `(detached:<sha>)`, or `(stale)` for a worktree that's gone from disk |
-| SYNC | Commits ahead and behind the branch's upstream. `✓ clean` means in step; `-` means no upstream, or detached |
-| CHANGES | Staged, modified and untracked file counts, or `✓ clean` |
-| PATH | Relative to the folder that contains the main repo, or the full path when it's elsewhere |
+| BRANCH | The branch, `(detached:<sha>)`, `(stale)` for a worktree that's gone from disk, or `(bare)` for a bare repo |
+| SYNC | Commits ahead and behind the branch's upstream, as of your last fetch. `✓ clean` means in step; `-` means no upstream, or detached |
+| CHANGES | `-l` only. Conflicted, staged, modified and untracked file counts, or `✓ clean`; `?` if git couldn't read the worktree |
+| LAST COMMIT | How long ago the worktree's current commit was made |
+| PATH | Relative to the folder that contains the main repo, or the full path when it's elsewhere. `(locked)` after it marks a worktree locked with `git worktree lock` |
 
-If any worktree is stale, `list` ends with a tip to run `git worktree prune`.
+Columns are as wide as their contents, counted in characters in a UTF-8 locale (under `LC_ALL=C`, rows with `✓` can be 2 short). If any worktree is stale, `list` ends with a tip to run `git worktree prune`.
+
+**Why CHANGES needs `-l`:** everything else comes from git's own records in three git commands, whatever the number of worktrees. Counting changes means running `git status` in each worktree, which reads every file, so it takes longer with many or large worktrees. `-l` runs up to 8 at a time.
+
+**`-s` / `--short`** lists just the branch and path, with no header, which makes it easy to use in scripts. It runs a single git command:
+
+```text
+$ gitwt ls -s
+  main                myapp
+  feature/dark-mode   worktrees/myapp/feature-dark-mode
+* feature/search      worktrees/myapp/feature-search
+  fix/login-timeout   worktrees/myapp/fix-login-timeout
+  (detached:ec13cda)  worktrees/myapp/review
+```
 
 ### `gitwt version` and `gitwt help`
 
@@ -446,7 +474,8 @@ Files gitwt reads:
 - subcommands after `gitwt `,
 - for `new`: local branches that don't have a worktree yet, plus `--from` and `--fetch`; after `--from`, all local branches,
 - for `switch` and `remove`: branches that have a worktree, plus `--branch` for `remove`,
-- for `move`: branches that have a worktree, except the main repo's, then folders for the second argument.
+- for `move`: branches that have a worktree, except the main repo's, then folders for the second argument,
+- for `list`: `-l`, `--long`, `-s` and `--short`.
 
 Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command not found: compdef` at startup (TASK-014). bash has no completion yet.
 
@@ -491,6 +520,8 @@ Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command
 ## Known limitations
 
 **bash 3.2 isn't tested or officially supported.** That's the version macOS ships as `/bin/bash`. zsh 5.9 and bash 5.2 are tested.
+
+**A worktree whose path contains a newline** shows as `(stale)` in `gitwt ls`. Reading such paths needs `git worktree list -z`, which is git 2.36+; gitwt supports 2.18.
 
 These are tracked on the [project board](https://ashikahmad.github.io/Kanban.md/app/?board=https://github.com/ashikahmad/gitwt/blob/dev/board/kanban.md):
 
