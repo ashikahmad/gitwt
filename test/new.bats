@@ -36,6 +36,42 @@ teardown() { teardown_repo; }
   assert_output --partial "does not exist"
 }
 
+@test "new: --from as the last argument → usage error, no branch created" {
+  run "$GITWT_RUNNER" new feat --from
+  assert_failure
+  assert_output --partial "--from requires a base branch"
+  assert_output --partial "Usage:"
+  run git show-ref --verify --quiet refs/heads/feat
+  assert_failure
+}
+
+@test "new: --from alone → usage error" {
+  run "$GITWT_RUNNER" new --from
+  assert_failure
+  assert_output --partial "--from requires a base branch"
+}
+
+@test "new: --from followed by another flag → usage error" {
+  run "$GITWT_RUNNER" new feat --from --fetch
+  assert_failure
+  assert_output --partial "--from requires a base branch"
+}
+
+@test "new: --from= with an empty value → usage error, no branch created" {
+  run "$GITWT_RUNNER" new feat --from=
+  assert_failure
+  assert_output --partial "--from requires a base branch"
+  run git show-ref --verify --quiet refs/heads/feat
+  assert_failure
+}
+
+@test "new: --from=<base> still works" {
+  git branch develop
+  run "$GITWT_RUNNER" new feat --from=develop
+  assert_success
+  assert_output --partial "Creating 'feat' from 'develop'"
+}
+
 @test "new: existing branch attaches worktree and cd's in" {
   git branch existing
   run "$GITWT_RUNNER" new existing

@@ -101,13 +101,21 @@ gitwt has no setup step, so ignored files and project setup must be redone by ha
 **Shared with TASK-001**: the code that reads `.worktreeinclude` should be one helper, because TASK-001 uses the same list to decide which ignored files to protect on removal. Files copied in by this task are the ones it compares with the main repo's copy, so keep the copy step predictable.
 
 ### TASK-005 | Fix infinite loop when --from has no value
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: High  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-05  
 **Tags**: #bug  
 
 `gitwt new foo --from` and `gitwt new --from` never finish, because `shift 2` fails without shifting (gitwt.sh:88). bash hangs silently; zsh prints `shift count must be <= $#` repeatedly (36 MB in 5 seconds). `--from=` does not hang.
+
+**Notes**:
+**Result**: `--from` with a missing, empty or flag-like value now prints an error and usage and returns 1 before creating anything. `--from=<base>` is normalised into the same check. Added 5 tests; full suite 34/34 under bash, and the error cases were also run by hand under zsh.
+
+**Modified files**:
+- gitwt.sh
+- test/new.bats
 
 ### TASK-006 | Warn when a branch already exists only on the remote
 **Status**: backlog  
