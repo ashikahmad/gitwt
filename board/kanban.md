@@ -232,11 +232,12 @@ The suite runs only under bash (test/run_gitwt.sh), although zsh is the primary 
 Without `--recurse-submodules`, `test/libs/*` is empty and run_tests.sh fails with `No such file or directory`. The README never mentions tests, submodules or bats. run_tests.sh also uses a relative `test/` path, so it fails when run from another directory.
 
 ### TASK-017 | Correct out-of-date README claims
-**Status**: in-review  
+**Status**: done  
 **Priority**: Medium  
 **Category**: Documentation  
 **Created**: 2026-11-05  
 **Started**: 2026-11-06  
+**Finished**: 2026-11-06  
 **Tags**: #docs  
 
 **Subtasks**:
@@ -357,11 +358,12 @@ New worktrees always went to `../worktrees/<repo>/<slug>`. The `gitwt.path` git 
 **Related**: TASK-003 covers moving existing worktrees. TASK-018 explains path collisions, which custom templates make easier to hit.
 
 ### TASK-024 | Write a usage guide and trim the README
-**Status**: in-review  
+**Status**: done  
 **Priority**: Medium  
 **Category**: Documentation  
 **Created**: 2026-11-06  
 **Started**: 2026-11-06  
+**Finished**: 2026-11-06  
 **Tags**: #docs  
 
 Each feature PR documents itself in the README, so after TASK-004 and TASK-023 the README has grown one section at a time. Nothing covers how features combine, and the `gitwt.*` settings are documented in different places. A separate, to-the-point guide keeps the README short.
