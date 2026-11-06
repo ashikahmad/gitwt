@@ -40,6 +40,8 @@ jobs:
         run: bundle exec jekyll build -d _site
         env:
           JEKYLL_ENV: production
+      - name: Check links
+        run: ruby check_links.rb _site /gitwt
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
