@@ -16,7 +16,7 @@ Instead of remembering long `git worktree` paths and flags, `gitwt` gives you si
 With plain `git worktree`, you manage paths. With `gitwt`, you name a branch — `gitwt sw feature/dark-mode` — and it finds the right directory for you. No memorising where you put things.
 
 **2. Worktrees live outside your repo, automatically.**<br/>
-By default, every worktree lands at `../worktrees/<repo>/<branch-slug>` — a predictable location next to your main repo. Your repo's own directory stays clean (no sibling folders cluttering the tree), and all worktrees for a project are grouped in one place. Prefer somewhere else? [Set your own layout](#custom-worktree-paths).
+By default, every worktree lands at `../worktrees/<repo>/<branch-slug>` — one predictable folder next to your main repo. Your repo's own directory stays clean, and all worktrees for a project are grouped in one place. Prefer somewhere else? [Set your own layout](docs/usage.md#where-worktrees-go).
 
 **3. Branch and worktree in a single command, without switching first.**<br/>
 With raw git you'd need to `git checkout develop && git pull && git checkout -b my-feature` before creating a worktree. `gitwt new my-feature --from develop --fetch` does it all in one shot from wherever you are — no need to leave your current branch.
@@ -25,273 +25,58 @@ With raw git you'd need to `git checkout develop && git pull && git checkout -b 
 
 ## Features
 
-- **`new`** — create a worktree and `cd` into it in one command; auto-detects whether to create a new branch or attach to an existing one
+- **`new`** — create a worktree and `cd` into it in one command; works out whether to create the branch or attach an existing one
 - **`switch` / `sw`** — jump into any worktree by branch name
-- **`remove`** — tear down a worktree; auto-returns you to the main repo if you're inside it
-- **`list` / `ls`** — clean table of all worktrees with branch and relative path
+- **`remove`** — tear down a worktree, and optionally its branch; returns you to the main repo if you're inside it
+- **`list` / `ls`** — a table of every worktree with its branch, sync with upstream, local changes and path
 - **Custom worktree paths** — choose where new worktrees go with a `gitwt.path` template, per repo or for all repos
-- **New worktree setup** — copy ignored files such as `.env` and run a setup script (your own, via `gitwt.postCreate`) automatically
+- **New worktree setup** — copy ignored files such as `.env` and run a setup script automatically
 - **Zsh tab-completion** via the included `_gitwt` completion script
 
 ---
 
-## Installation
-
-### Quick install (recommended)
+## Install
 
 ```bash
-git clone https://github.com/your-username/gitwt.git
+git clone https://github.com/ashikahmad/gitwt.git
 cd gitwt
 bash install.sh
+source ~/.zshrc    # or: source ~/.bashrc
 ```
 
-Then reload your shell:
-
-```bash
-# zsh
-source ~/.zshrc
-
-# bash
-source ~/.bashrc
-```
-
-### Manual install
-
-1. Copy the files to a permanent location:
-
-```bash
-mkdir -p ~/.config/gitwt
-cp gitwt.sh ~/.config/gitwt/gitwt.sh
-cp _gitwt   ~/.config/gitwt/_gitwt
-```
-
-2. Add to your `~/.zshrc` or `~/.bashrc`:
-
-```bash
-# For bash and zsh
-source "$HOME/.config/gitwt/gitwt.sh"
-
-# For zsh tab-completion (zsh only)
-source "$HOME/.config/gitwt/_gitwt"
-```
-
-3. Reload your shell.
+Requires git 2.18+ and zsh or bash. To install by hand or update, see [Install](docs/usage.md#install).
 
 ---
 
-## Usage
-
-```
-gitwt <command> [args]
-```
-
-### `gitwt new <branch-name>`
-
-Create a worktree and `cd` into it immediately. Smart about the branch:
-
-- **Branch doesn't exist** — creates it first (from current branch, or `--from <base>`), then creates the worktree
-- **Branch already exists** — skips branch creation and just attaches a worktree
+## Quick start
 
 ```bash
-gitwt new feature/dark-mode                         # new branch off current branch
-gitwt new feature/dark-mode --from develop          # new branch off develop
+gitwt ls                                            # see all worktrees
+gitwt new feature/dark-mode                         # new branch off the current one, worktree, cd in
 gitwt new feature/dark-mode --from main --fetch     # fetch main first, then branch off it
-gitwt new fix/existing-branch                       # existing branch — just attach worktree
+gitwt new fix/existing-branch                       # existing branch: just add a worktree
+gitwt sw main                                       # jump to another worktree
+gitwt remove feature/dark-mode --branch             # remove the worktree and its branch
 ```
 
-`--from` and `--fetch` are ignored when the branch already exists.
-
-### `gitwt switch <branch-name>` (alias: `sw`)
-
-`cd` into an existing worktree by branch name.
+Bring ignored files and project setup into every new worktree:
 
 ```bash
-gitwt sw feature/dark-mode
-gitwt sw main
+printf '.env\n' > .worktreeinclude                  # copy .env from the main repo
+git config gitwt.postCreate scripts/setup.sh        # run your setup script (asks once)
 ```
 
-### `gitwt remove <branch-name>`
-
-Remove a worktree. If your shell is currently inside that worktree, it automatically navigates back to the main repo root.
+Put worktrees somewhere else:
 
 ```bash
-gitwt remove feature/dark-mode
-gitwt remove feature/dark-mode --branch   # also delete the local branch
-```
-
-The `--branch` flag uses a safe delete (`git branch -d`) — it will refuse to delete a branch with unmerged commits.
-
-### `gitwt list` (alias: `ls`)
-
-Show all worktrees with branch, sync state (ahead/behind upstream), local changes (staged/modified/untracked), and path.
-
-```
-BRANCH                                   SYNC                       CHANGES                        PATH
-──────────────────────────────────────   ────────────────────────   ────────────────────────────   ──────────────────────────────────────
-main                                     ✓ clean                    ✓ clean                        myrepo
-feature/dark-mode                        -                          2 modified · 1 untracked       worktrees/myrepo/feature-dark-mode
-fix/login-bug                            3 ahead                    clean                          worktrees/myrepo/fix-login-bug
-fix/auth                                 1 ahead · 2 behind         2 modified                     worktrees/myrepo/fix-auth
-(detached:abc1234)                       -                          1 staged                       worktrees/myrepo/some-worktree
+git config --global gitwt.path '~/worktrees/{repo}/{slug}'
 ```
 
 ---
 
-## Worktree path layout
+## Documentation
 
-By default, worktrees are placed at a predictable location relative to your main repo:
-
-```
-../worktrees/<repoName>/<type>-<rest-of-branch-name>
-```
-
-Examples:
-
-| Branch | Worktree path |
-|---|---|
-| `feature/dark-mode` | `../worktrees/myrepo/feature-dark-mode` |
-| `fix/checkin-timeout` | `../worktrees/myrepo/fix-checkin-timeout` |
-| `hotfix` | `../worktrees/myrepo/hotfix` |
-
-### Custom worktree paths
-
-Set the `gitwt.path` git config to a template. It works like any git setting: a repo's value overrides the global one, and `includeIf` can set it per directory.
-
-```bash
-git config --global gitwt.path '~/worktrees/{repo}/{slug}'   # all repos
-git config gitwt.path '.worktrees/{slug}'                    # this repo only
-git config --global --unset gitwt.path                       # back to the default
-```
-
-| Placeholder | Value for `feature/dark-mode` in `myrepo` |
-|---|---|
-| `{repo}` | `myrepo` |
-| `{slug}` | `feature-dark-mode` |
-| `{branch}` | `feature/dark-mode` (creates nested folders) |
-
-The default is `../worktrees/{repo}/{slug}`. Some other layouts:
-
-| `gitwt.path` | Worktree path |
-|---|---|
-| `../{repo}-worktrees/{slug}` | `../myrepo-worktrees/feature-dark-mode` |
-| `../{repo}-{slug}` | `../myrepo-feature-dark-mode` |
-| `~/worktrees/{repo}/{branch}` | `~/worktrees/myrepo/feature/dark-mode` |
-| `.worktrees/{slug}` | `.worktrees/feature-dark-mode`, inside the repo |
-
-- The template must include `{slug}` or `{branch}`, and other placeholders are rejected. Shell variables such as `$HOME` are rejected too, because git doesn't expand them: use `~` or a full path.
-- Relative paths start from the main repo root, wherever you run `gitwt` from.
-- Paths can clash. `{slug}` gives `feature/a-b` and `feature-a/b` the same folder, a global template without `{repo}` puts all your repos in one folder, and two repos with the same folder name can clash even with `{repo}`. `gitwt new` stops and tells you which branch or repo is using the folder.
-- Inside the repo, a worktree shows as untracked until it's ignored. `gitwt new` prints the line to add to `.git/info/exclude`.
-- Changing the setting only affects new worktrees. Existing ones stay put, and `switch`, `remove` and `list` still find them.
-
----
-
-## Typical workflow
-
-```bash
-# See all current worktrees
-gitwt ls
-
-# Start a new feature (branch off current + worktree + cd in)
-gitwt new feature/dark-mode
-
-# Start from a specific base branch
-gitwt new feature/dark-mode --from develop --fetch
-
-# Attach a worktree to an existing branch (no --from or --fetch needed)
-gitwt new fix/existing-branch
-
-# Jump between worktrees
-gitwt sw main
-gitwt sw feature/dark-mode
-
-# Remove when done
-gitwt remove feature/dark-mode
-```
-
----
-
-## New worktree setup
-
-New worktrees start without your ignored files and project setup. `gitwt new` can handle both, whether it creates a branch or attaches an existing one.
-
-### Copy ignored files: `.worktreeinclude`
-
-List the files to bring along in a `.worktreeinclude` at the root of the main repo, using gitignore syntax:
-
-```gitignore
-.env
-.env.local
-config/secrets.json
-```
-
-Files are copied from the main repo, even when you run `gitwt new` inside another worktree. A file is copied only if it matches this list **and** git ignores it, and anything already in the new worktree is left alone. If a listed file can't be copied, you get a warning, the worktree is kept, you're still moved into it, and `gitwt new` returns 1.
-
-### Run a setup script: `.gitwt/post-create`
-
-Commit an executable script at `.gitwt/post-create`, for example to install dependencies:
-
-```sh
-#!/bin/sh
-npm install
-```
-
-It runs inside the new worktree, after files are copied, with `GITWT_BRANCH`, `GITWT_WORKTREE` and `GITWT_MAIN_ROOT` set. The script is read from the new worktree, so the branch you create or attach needs to contain it.
-
-### Use your own script: `gitwt.postCreate`
-
-To have gitwt run a script you already use by hand, such as `scripts/setup.sh`, point to it in git config instead:
-
-```sh
-git config gitwt.postCreate scripts/setup.sh            # this repo
-git config --global gitwt.postCreate scripts/setup.sh   # every repo
-```
-
-The path is relative to the repo root and must stay inside it. When `gitwt.postCreate` is set, only that script runs and `.gitwt/post-create` is ignored. To turn setup off for a repo, even if it has `.gitwt/post-create`, set it to an empty value: `git config gitwt.postCreate ""`.
-
-If the configured file is missing, not executable or outside the repo, you get a warning, no script runs and `gitwt new` returns 1. gitwt does not fall back to `.gitwt/post-create`.
-
-The `GITWT_*` variables are only set when gitwt runs the script, so a script you also run by hand should work without them.
-
-### Approving the script
-
-Because the script comes from the repo, gitwt asks before running it. Your approval covers that exact version of the script and is stored in the repo's local git config, so a changed script asks again. Only one version is approved at a time, so branches with different versions of the script each ask again. Approval covers only the script file itself: if it runs other files from the repo, changes to those don't ask again, so review what it calls too. Without a terminal, an unapproved script is skipped with a note. If the script fails, you get a warning and the worktree is kept, you're still moved into it, and `gitwt new` returns 1.
-
-```sh
-git config gitwt.postCreateApproved "$(git hash-object --no-filters .gitwt/post-create)"  # approve without the prompt
-git config --unset gitwt.postCreateApproved                                              # revoke approval
-```
-
----
-
-## Zsh tab-completion
-
-The `_gitwt` completion script provides context-aware tab-completion:
-
-- Subcommand names are completed after `gitwt `
-- `gitwt new` suggests local branches that don't already have a worktree, plus `--from` and `--fetch` flags; completing after `--from` lists local branches
-- `gitwt switch` and `gitwt remove` list only branches that have an active worktree
-
-The `install.sh` script adds the completion source line to `.zshrc` automatically.
-
----
-
-## Pro tip: shorter alias
-
-If you find yourself typing `gitwt` a lot, you can add a shorter alias to your `~/.zshrc` or `~/.bashrc`:
-
-```bash
-alias gwt="gitwt"
-```
-
-Then use `gwt` everywhere instead — `gwt new feature/dark-mode`, `gwt sw main`, etc.
-
----
-
-## Requirements
-
-- Git 2.5+ (worktree support)
-- bash or zsh
+The **[usage guide](docs/usage.md)** covers every command and option, where worktrees go, setting up new worktrees, all settings, troubleshooting and known limitations. `gitwt help` prints a summary in the terminal.
 
 ---
 

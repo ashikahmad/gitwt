@@ -232,18 +232,26 @@ The suite runs only under bash (test/run_gitwt.sh), although zsh is the primary 
 Without `--recurse-submodules`, `test/libs/*` is empty and run_tests.sh fails with `No such file or directory`. The README never mentions tests, submodules or bats. run_tests.sh also uses a relative `test/` path, so it fails when run from another directory.
 
 ### TASK-017 | Correct out-of-date README claims
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: Documentation  
 **Created**: 2026-11-05  
+**Started**: 2026-11-06  
 **Tags**: #docs  
 
 **Subtasks**:
-- [ ] README.md:41: replace the `your-username` clone URL with `ashikahmad`
-- [ ] README.md:207: change "Git 2.5+" to 2.17+, since `git worktree list --porcelain` needs 2.7 and `git worktree remove` needs 2.17
-- [ ] README.md:131: show `✓ clean` instead of `clean`
-- [ ] README.md:31: describe all four `list` columns, not just branch and path
-- [ ] README.md:19: reword "no sibling folders", since `../worktrees` is one sibling folder; "outside your repo" is accurate
+- [x] README.md:41: replace the `your-username` clone URL with `ashikahmad`
+- [x] README.md:207: change "Git 2.5+" to 2.18+, since `git worktree list --porcelain` needs 2.7 and `git worktree remove` needs 2.17
+- [x] README.md:131: show `✓ clean` instead of `clean`
+- [x] README.md:31: describe all four `list` columns, not just branch and path
+- [x] README.md:19: reword "no sibling folders", since `../worktrees` is one sibling folder; "outside your repo" is accurate
+
+**Notes**:
+**Result**: done as part of TASK-024's README rewrite. The minimum is 2.18, not 2.17: `gitwt.path` reads its value with `git config --type=path`, which arrived in git 2.18. The `list` example and column descriptions moved to the usage guide.
+
+**Modified files**:
+- README.md
+- docs/usage.md
 
 ### TASK-018 | Explain worktree path collisions
 **Status**: done  
@@ -349,21 +357,30 @@ New worktrees always went to `../worktrees/<repo>/<slug>`. The `gitwt.path` git 
 **Related**: TASK-003 covers moving existing worktrees. TASK-018 explains path collisions, which custom templates make easier to hit.
 
 ### TASK-024 | Write a usage guide and trim the README
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: Documentation  
 **Created**: 2026-11-06  
+**Started**: 2026-11-06  
 **Tags**: #docs  
 
 Each feature PR documents itself in the README, so after TASK-004 and TASK-023 the README has grown one section at a time. Nothing covers how features combine, and the `gitwt.*` settings are documented in different places. A separate, to-the-point guide keeps the README short.
 
 **Subtasks**:
-- [ ] Write `docs/usage.md`, one section per command and feature: what it does, exact commands, and what happens on failure
-- [ ] Add one reference table of all `gitwt.*` settings (`gitwt.path`, `gitwt.postCreate`, `gitwt.postCreateApproved`): purpose, repo or global, default
-- [ ] Explain how custom paths, `.worktreeinclude` and the setup script work together, including worktrees inside the repo and symlinked paths (`GITWT_WORKTREE` holds the symlink path)
-- [ ] Add troubleshooting built from the actual messages, such as "not approved", "doesn't exist in the new worktree" and "could not copy"
-- [ ] Trim the README to an overview and quick start that link to the guide
-- [ ] Check that `gitwt help` matches the guide
+- [x] Write `docs/usage.md`, one section per command and feature: what it does, exact commands, and what happens on failure
+- [x] Add one reference table of all `gitwt.*` settings (`gitwt.path`, `gitwt.postCreate`, `gitwt.postCreateApproved`): purpose, repo or global, default
+- [x] Explain how custom paths, `.worktreeinclude` and the setup script work together, including worktrees inside the repo and symlinked paths (`GITWT_WORKTREE` holds the symlink path)
+- [x] Add troubleshooting built from the actual messages, such as "not approved", "doesn't exist in the new worktree" and "could not copy"
+- [x] Trim the README to an overview and quick start that link to the guide
+- [x] Check that `gitwt help` matches the guide
 
 **Notes**:
 **Plan**: start after PR #3 (TASK-023, TASK-018) is merged into `dev`. If TASK-001 is close, wait for it too, since it changes what `gitwt remove` does with ignored files. Fold in or coordinate with TASK-017, which fixes specific README claims.
+
+**Result**: `docs/usage.md` covers install, every command and flag, where worktrees go, new worktree setup, how they combine, a settings table, use in scripts, zsh completion, troubleshooting from the actual messages, and known limitations linked to board tasks. The README is now an overview, install, quick start and a link to the guide (306 lines down to about 100). `gitwt help` matched the guide and now links to it. The README quick start was run under zsh, and every relative link and anchor resolves. TASK-017's fixes are folded in, since they were on the same lines.
+
+**Modified files**:
+- docs/usage.md (new)
+- README.md
+- gitwt.sh (help text only)
+
