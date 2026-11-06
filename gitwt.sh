@@ -5,7 +5,7 @@
 
 gitwt() {
   local cmd="${1:-help}"
-  local GITWT_VERSION="0.1.0"
+  local GITWT_VERSION="0.2.0"
 
   case "$cmd" in
     new)               _gitwt_new    "${@:2}" ;;
@@ -1204,15 +1204,7 @@ TYPICAL WORKFLOW
     gitwt sw main                                   # jump to any branch
     gitwt remove feature/dark-mode                  # done — jumps back to main repo if needed
 
-INSTALL
-  1. Place this file somewhere permanent, e.g.:
-       mkdir -p ~/.config/gitwt
-       cp gitwt.sh ~/.config/gitwt/gitwt.sh
-
-  2. Add to your ~/.zshrc or ~/.bashrc:
-       source ~/.config/gitwt/gitwt.sh
-
-  3. Reload your shell:
-       source ~/.zshrc   # or source ~/.bashrc
+INSTALL AND UPDATE
+  curl -fsSL https://raw.githubusercontent.com/ashikahmad/gitwt/main/install.sh | bash
 EOF
 }

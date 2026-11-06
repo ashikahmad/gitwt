@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 35 -->
+<!-- Config: Last Task ID: 36 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -185,13 +185,17 @@ With a fetched `origin/feature/x` and no local branch, `gitwt new feature/x` cre
 Argument parsing lets the last positional win and treats unknown flags as branch names. `gitwt remove a b` removes only b. `gitwt new foo --frm develop` targets `develop` and drops `foo`. `gitwt remove --force a` removes a without forcing or complaining. `gitwt nwe foo` prints help and returns 0 (gitwt.sh:16), so typos in scripts pass silently.
 
 ### TASK-008 | Fix install.sh reporting success when nothing was wired up
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: High  
 **Category**: Install  
 **Created**: 2026-11-05  
+**Started**: 2026-11-06  
 **Tags**: #bug  
 
 With no `.zshrc`, `.bashrc` or `.zprofile`, install.sh prints `not found — skipping` for each file, then `==> Done!`, returns 0 and says to `source ~/.zshrc`, which does not exist. A new shell cannot find `gitwt`. The Darwin fallback helps only when `.zprofile` already exists, and the `.bash_profile` fallback named in the comment is not implemented.
+
+**Notes**:
+**Plan**: done as part of TASK-036, the one-line install, where a home with no shell config files is common.
 
 ### TASK-009 | Stop new branches tracking their base after --fetch
 **Status**: backlog  
@@ -249,13 +253,17 @@ Three related problems around gitwt.sh:237-243. The check is a plain string pref
 When the branch delete fails, the function still returns 0 and always blames unmerged commits (gitwt.sh:250-254). A branch used by another worktree and a stale ref lock both produce the wrong tip with status 0. test/remove.bats:37 checks the tip but not the status.
 
 ### TASK-014 | Stop zsh startup error when compinit has not run
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: Shell Integration  
 **Created**: 2026-11-05  
+**Started**: 2026-11-06  
 **Tags**: #bug  
 
 Without compinit, sourcing `_gitwt` fails with `command not found: compdef` (_gitwt:96). install.sh adds the source line without checking, so a `.zshrc` without compinit prints the error at every shell start. `gitwt` itself still loads, and a `.zshrc` that runs compinit earlier is unaffected.
+
+**Notes**:
+**Plan**: done as part of TASK-036, the one-line install.
 
 ### TASK-015 | Test under zsh, cover --fetch and add CI
 **Status**: backlog  
@@ -353,10 +361,11 @@ Under bash 3.2, printf pads by bytes, so `✓`, `·` and `─` misalign rows (PA
 The check at gitwt.sh:33 never fires because the pipeline's status is awk's. Outside a repo, git's `not a git repository` prints first, then gitwt adds a misleading line: `could not determine current branch (are you in detached HEAD state?)`, or `base branch 'x' does not exist locally` with `--from x`. `gitwt list` already handles this correctly.
 
 ### TASK-022 | Make install.sh handle earlier installs correctly
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: Install  
 **Created**: 2026-11-05  
+**Started**: 2026-11-06  
 **Tags**: #bug  
 
 Reinstalling over the installer's own earlier install works: files are updated and no lines are duplicated. Other kinds of earlier install go wrong. Tested in throwaway home directories.
@@ -366,17 +375,19 @@ Run from a clone in `~/.config/gitwt`, or with installed files symlinked to a re
 `append_if_missing` searches for one exact line (install.sh:28). `source "$HOME/.config/gitwt/gitwt.sh"` and `source ~/.config/gitwt/gitwt.sh`, the forms the README and `gitwt help` tell people to use, are not recognised, so a second set of source lines is added and gitwt loads twice. A commented-out line is treated as installed, so gitwt stays disabled while the installer reports `Already present` and `Done!`.
 
 **Subtasks**:
-- [ ] Skip the copy when source and destination are the same file
-- [ ] Still wire up shell config when the copy is skipped
-- [ ] Recognise any active line that sources gitwt, whatever form its path takes
-- [ ] Ignore commented-out lines when checking
-- [ ] Report clearly what was updated, added or left alone
-- [ ] Add tests for these reinstall cases
+- [x] Skip the copy when source and destination are the same file
+- [x] Still wire up shell config when the copy is skipped
+- [x] Recognise any active line that sources gitwt, whatever form its path takes
+- [x] Ignore commented-out lines when checking
+- [x] Report clearly what was updated, added or left alone
+- [x] Add tests for these reinstall cases
 
 **Notes**:
 **Related**: TASK-008 covers a home with no shell config files. TASK-014 covers the `compdef` error from the source line.
 
 **Also noted, not in scope yet**: the installer's reinstall output shows no versions, and every version reports `0.1.0`. Source lines use an absolute home path rather than `$HOME`. There is no uninstall.
+
+**Plan**: done as part of TASK-036, the one-line install, which makes reinstalls over other kinds of install more common.
 
 ### TASK-023 | Let users configure the worktree path
 **Status**: done  
@@ -533,3 +544,40 @@ Switching needs the branch name typed out. `gitwt sw` with no branch only prints
 **Later**: an opt-in keyboard shortcut, such as Ctrl-G, that opens the picker from anywhere.
 
 **Related**: TASK-033 (`ls -s`), TASK-020 (switching to detached worktrees).
+
+### TASK-036 | Install with one command, without cloning
+**Status**: in-review  
+**Priority**: High  
+**Category**: Install  
+**Created**: 2026-11-06  
+**Started**: 2026-11-06  
+**Tags**: #feature  
+
+`install.sh` copies `gitwt.sh` and `_gitwt` from the folder it's in, so installing needs a clone. Piped from the web it fails on the first copy.
+
+**Subtasks**:
+- [x] `curl -fsSL https://raw.githubusercontent.com/ashikahmad/gitwt/main/install.sh | bash` downloads the files when they aren't next to the script
+- [x] Download from a version tag (`v<version>`), not `main`, so a version always installs the same files; `GITWT_REF` overrides it
+- [x] Use curl, or wget if there's no curl; check what's downloaded is gitwt before installing it
+- [x] Bump the version to 0.2.0, kept the same in `gitwt.sh` and `install.sh`
+- [x] Fix the installer bugs in TASK-008, TASK-014 and TASK-022
+- [x] Show the one-liner on the website's landing page, Homebrew-style, and in the README, guide and `gitwt help`
+- [x] Add tests, without network access
+- [ ] At release: tag `v0.2.0`, then check the one-liner works
+
+**Notes**:
+**Design**: running the same command again updates gitwt. Running `install.sh` from a clone works as before. The docs also show downloading `install.sh`, reading it, then running it, for people who'd rather not pipe a script into a shell. A Homebrew formula was considered and left for later: it needs a separate tap repository and people would still add the `source` lines themselves.
+
+**Result**: `install.sh` installs from a clone as before, or, piped through bash, downloads `gitwt.sh` and `_gitwt` from `v<version>` (override with `GITWT_REF`) with curl or wget, checks they're gitwt (an error page or a failed download installs nothing), and replaces files by copying beside them and renaming, so read-only files are replaced too. Shell config: it wires up whichever of `~/.zshrc` (respecting `ZDOTDIR`) and `~/.bashrc` exist; with neither, it creates one for the login shell, or fails with the line to add for other shells (TASK-008). It recognises an existing active source line written any way and ignores commented-out ones, and a clone at `~/.config/gitwt` or symlinked files are left as is (TASK-022). `_gitwt` skips `compdef` quietly when compinit hasn't run (TASK-014). The version is 0.2.0 in both files, and a test keeps them equal. The landing page now leads with the one-liner and a copy button, Homebrew-style; the README, guide and `gitwt help` show it too.
+
+Tests: 18 in `test/install.bats`, with a fake curl serving the repo's own files, run from an unrelated folder; 17 fail against the old installer, and the read-only test is skipped as root (checked by hand as a non-root user: the old installer fails with "Permission denied", the new one replaces the files). Full suite 173/173.
+
+**Modified files**:
+- install.sh
+- _gitwt
+- gitwt.sh (version and help text)
+- test/install.bats (new)
+- README.md
+- docs/usage.md
+- site/index.html
+

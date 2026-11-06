@@ -39,13 +39,12 @@ With raw git you'd need to `git checkout develop && git pull && git checkout -b 
 ## Install
 
 ```bash
-git clone https://github.com/ashikahmad/gitwt.git
-cd gitwt
-bash install.sh
-source ~/.zshrc    # or: source ~/.bashrc
+curl -fsSL https://raw.githubusercontent.com/ashikahmad/gitwt/main/install.sh | bash
 ```
 
-Requires git 2.18+ and zsh or bash. Tested with zsh 5.9 and bash 5.2; bash 3.2, the version macOS ships, isn't tested or officially supported. To install by hand or update, see [Install](docs/usage.md#install).
+Then open a new terminal. Run the same command again to update. To read the script before running it, or to install from a clone or by hand, see [Install](docs/usage.md#install).
+
+Requires git 2.18+ and zsh or bash. Tested with zsh 5.9 and bash 5.2; bash 3.2, the version macOS ships, isn't tested or officially supported.
 
 ---
 

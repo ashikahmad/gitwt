@@ -109,4 +109,8 @@ _gitwt_complete_remove() {
   [[ "$used" != *"--branch"* ]] && compadd -- --branch
 }
 
-compdef _gitwt gitwt
+# compdef only exists once compinit has run. Without it, skip completion quietly rather than
+# print "command not found: compdef" at every shell start; source this file after compinit.
+if (( $+functions[compdef] )); then
+  compdef _gitwt gitwt
+fi

@@ -23,22 +23,40 @@ gitwt is a shell function, so it has to be sourced into your shell rather than r
 
 **Tested with** zsh 5.9 and bash 5.2. bash 3.2, the version macOS ships as `/bin/bash`, isn't tested or officially supported: gitwt may work there, but changes aren't checked against it. On macOS, the default shell is zsh, which is supported.
 
-**With the installer:**
+**With one command:**
 
 ```bash
-git clone https://github.com/ashikahmad/gitwt.git
-cd gitwt
-bash install.sh
-source ~/.zshrc    # or: source ~/.bashrc
+curl -fsSL https://raw.githubusercontent.com/ashikahmad/gitwt/main/install.sh | bash
 ```
 
-`install.sh` copies `gitwt.sh` and `_gitwt` to `~/.config/gitwt/` and adds source lines to `~/.zshrc` and `~/.bashrc`. It only edits files that already exist, and it skips a line that's already there. zsh also gets the tab-completion line.
+Then open a new terminal, or run `source ~/.zshrc` (or `~/.bashrc`).
+
+The installer:
+
+- puts `gitwt.sh` and `_gitwt` in `~/.config/gitwt/`, downloaded from this version's release tag, so a version always installs the same files,
+- adds the lines that load them to `~/.zshrc` and/or `~/.bashrc`, whichever exist (zsh also gets tab-completion). With neither, it creates one for your login shell. It respects `ZDOTDIR`,
+- skips a line that's already there, however it's written (`~/` or `$HOME/`, `source` or `.`), but not one that's commented out,
+- needs `curl` or `wget`, and checks that what it downloaded is really gitwt before installing anything.
+
+**To read it first:**
+
+```bash
+curl -fsSL -o install.sh https://raw.githubusercontent.com/ashikahmad/gitwt/main/install.sh
+less install.sh
+bash install.sh
+```
+
+**From a clone:** `git clone https://github.com/ashikahmad/gitwt.git && bash gitwt/install.sh`. This copies the clone's files instead of downloading, so it installs whatever the clone has checked out.
+
+**Another version:** `GITWT_REF` picks the branch or tag to download, for example `… | GITWT_REF=main bash` for the latest unreleased changes.
 
 **By hand:**
 
 ```bash
 mkdir -p ~/.config/gitwt
-cp gitwt.sh _gitwt ~/.config/gitwt/
+cd ~/.config/gitwt
+curl -fsSLO https://raw.githubusercontent.com/ashikahmad/gitwt/main/gitwt.sh
+curl -fsSLO https://raw.githubusercontent.com/ashikahmad/gitwt/main/_gitwt
 ```
 
 Then add to `~/.zshrc` or `~/.bashrc`:
@@ -48,7 +66,7 @@ source "$HOME/.config/gitwt/gitwt.sh"
 source "$HOME/.config/gitwt/_gitwt"   # zsh only, after compinit
 ```
 
-**To update**, pull the clone and run `bash install.sh` again, or copy the two files again.
+**To update**, run the install command again. It replaces the two files and adds nothing twice.
 
 **A shorter name:** `alias gwt=gitwt` in your shell config.
 
@@ -477,7 +495,7 @@ Files gitwt reads:
 - for `move`: branches that have a worktree, except the main repo's, then folders for the second argument,
 - for `list`: `-l`, `--long`, `-s` and `--short`.
 
-Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command not found: compdef` at startup (TASK-014). bash has no completion yet.
+Source it after `compinit` in `~/.zshrc`; the installer adds it at the end, which is after `compinit` in most setups. If `compinit` hasn't run, completion is skipped quietly rather than printing an error. bash has no completion yet.
 
 ---
 
@@ -531,5 +549,4 @@ These are tracked on the [project board](https://ashikahmad.github.io/Kanban.md/
 | TASK-007 | Unknown flags and commands aren't rejected |
 | TASK-009 | After `--fetch` branches from the remote, the new branch tracks the base branch |
 | TASK-010 | `--from` accepts only local branches, not `origin/x`, tags or SHAs |
-| TASK-014 | Sourcing `_gitwt` before `compinit` prints an error at zsh startup |
 | TASK-020 | `switch` and `remove` can't target a detached worktree |
