@@ -102,14 +102,35 @@ gitwt switch <branch>      # alias: gitwt sw <branch>
 ### `gitwt remove`
 
 ```text
-gitwt remove <branch> [--branch]
+gitwt remove <branch> [--branch] [--force]
 ```
 
-Removes the worktree that has `<branch>` checked out. If your shell is inside it, gitwt first moves you to the main repo.
+Removes the worktree that has `<branch>` checked out. If your shell is inside it, gitwt moves you to the main repo, but only once removal is going ahead: if it's refused, you stay where you are.
 
+Before removing, gitwt checks that nothing would be lost:
+
+| In the worktree | What happens |
+|---|---|
+| Uncommitted changes or untracked files | Refuses. Commit or stash them first |
+| A file listed in [`.worktreeinclude`](#copy-ignored-files-worktreeinclude), unchanged from the main repo's copy | Removes it quietly: the main repo still has it |
+| A listed file changed in the worktree | Refuses, and prints a `diff` command to compare it with the main repo's copy |
+| A listed file that exists only in the worktree | Refuses, and prints a `cp` command to copy it to the main repo. It also warns if the main repo doesn't ignore that file, since a copy there could be committed |
+| Other ignored files, such as `node_modules/` or `dist/` | Removes them, and names them in one line. Without a `.worktreeinclude`, it suggests adding one |
+
+gitwt never asks a question here and never writes to the main repo; it refuses and says what to do. So it behaves the same in a terminal and in scripts.
+
+```text
+$ gitwt remove feature/x
+Error: removing this worktree would lose files listed in .worktreeinclude.
+Changed here, so they differ from the main repo's copy. To compare:
+  diff '/code/myrepo/.env' '/code/worktrees/myrepo/feature-x/.env'
+To remove it anyway and lose them: gitwt remove feature/x --force
+```
+
+- **`--force`** skips these checks and removes the worktree anyway, permanently discarding uncommitted work and ignored files. Check what you'd lose first.
 - **`--branch`** also deletes the local branch, with `git branch -d`, so a branch with unmerged commits is kept. To delete it anyway: `git branch -D <branch>`.
-- **Uncommitted work stops it.** git refuses to remove a worktree with modified, staged or untracked files. gitwt then prints the `git worktree remove --force` command; check what you'd lose before running it.
-- **Ignored files are deleted without asking.** That includes files copied in by [`.worktreeinclude`](#copy-ignored-files-worktreeinclude), such as `.env`. If you edited one inside the worktree, copy it out first. TASK-001 on the [board](#known-limitations) will add a check.
+- **The main repo can't be removed.** `gitwt remove main`, when `main` is checked out in the main repo, is refused.
+- **Only the main repo's copy is compared.** gitwt doesn't check other worktrees, and `.worktreeinclude` is read from the main repo, the same list used when [copying files in](#copy-ignored-files-worktreeinclude).
 
 ### `gitwt list`
 
@@ -335,7 +356,7 @@ Some combinations worth knowing:
 - **Custom paths and setup work together.** Files are copied and the script runs wherever the worktree goes, including `{branch}` paths and paths through a symlink.
 - **Worktrees inside the repo don't copy each other's files.** With `.worktrees/{slug}` and `**/.env` listed, a sibling worktree's `.env` isn't copied into the new one; only the main repo's files are.
 - **Symlinked paths:** when `gitwt.path` goes through a symlink, `GITWT_WORKTREE` holds the path through the symlink, not the resolved one. Both work.
-- **Removing deletes copied files.** `gitwt remove` deletes ignored files, including ones `.worktreeinclude` copied in. The main repo still has its copy, so you only lose edits made inside the worktree.
+- **One list, both ways.** The main repo's `.worktreeinclude` decides what's copied into a new worktree and what's checked before one is removed. An unchanged copy is removed quietly; one you edited, or a listed file you created in the worktree, stops `gitwt remove`.
 
 ---
 
@@ -401,7 +422,11 @@ Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command
 | `… failed. The worktree was still created.` | The setup script exited with an error | Fix it and run it by hand in the worktree |
 | `no worktree found for branch 'x'` | `x` has no worktree | `gitwt list` |
 | `worktree path no longer exists` | The folder was deleted outside git | `git worktree prune` |
-| `Tip: if there are uncommitted changes, use: git worktree remove --force …` | `remove` was refused, usually for uncommitted work | Commit or stash, or force it if you're sure |
+| `'x' has uncommitted changes or untracked files` | `remove` won't discard work | Commit or stash, or `gitwt remove x --force` if you're sure |
+| `removing this worktree would lose files listed in .worktreeinclude` | A listed file was changed in the worktree, or exists only there | Run the `diff` or `cp` commands it prints, then remove again; or `--force` |
+| `isn't ignored in the main repo, so a copy there could be committed` | Copying that file to the main repo would make it committable | Add it to the main repo's `.gitignore` first, or copy it somewhere else |
+| `'x' is checked out in the main repo, which isn't a removable worktree` | You named the main repo's branch | Nothing to remove |
+| `cannot remove a locked working tree` | The worktree is locked with `git worktree lock` | `git worktree unlock <path>`, then remove again |
 | `Tip: branch has unmerged commits` | `--branch` kept the branch | `git branch -D x` if you're sure |
 
 ---
@@ -412,7 +437,6 @@ These are tracked on the [project board](https://ashikahmad.github.io/Kanban.md/
 
 | Task | Limitation |
 |---|---|
-| TASK-001 | `remove` deletes ignored files, including copied `.env` files, without warning |
 | TASK-006 | `new` for a branch that exists only on the remote creates a fresh local branch instead of tracking it |
 | TASK-007 | Unknown flags and commands aren't rejected |
 | TASK-009 | After `--fetch` branches from the remote, the new branch tracks the base branch |

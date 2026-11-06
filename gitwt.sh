@@ -192,11 +192,12 @@ _gitwt_find_path() {
   echo "$found"
 }
 
-# Prints the files in <dir> that its .worktreeinclude lists and git ignores, NUL-separated.
+# Prints the files in <dir> that a .worktreeinclude lists and git ignores, NUL-separated.
+# The list is <dir>/.worktreeinclude, or <include-file> when given.
 _gitwt_included_files() {
-  local dir="$1"
-  [[ -f "$dir/.worktreeinclude" ]] || return 0
-  git -C "$dir" ls-files -z --others --ignored --exclude-from=.worktreeinclude 2>/dev/null \
+  local dir="$1" include="${2:-$1/.worktreeinclude}"
+  [[ -f "$include" ]] || return 0
+  git -C "$dir" ls-files -z --others --ignored --exclude-from="$include" 2>/dev/null \
     | git -C "$dir" check-ignore -z --stdin 2>/dev/null
   return 0
 }
@@ -433,18 +434,107 @@ _gitwt_switch() {
   cd "$worktree_path" || return 1
 }
 
+# Quotes a string for pasting into a shell command.
+_gitwt_quote() {
+  local q="'"
+  printf "'%s'" "${1//$q/$q\\$q$q}"
+}
+
+# Whether two paths hold the same file: same contents, or symlinks with the same target.
+_gitwt_same_file() {
+  local a="$1" b="$2"
+  if [[ -L "$a" || -L "$b" ]]; then
+    [[ -L "$a" && -L "$b" && "$(readlink "$a")" == "$(readlink "$b")" ]]
+    return
+  fi
+  [[ -f "$a" && -f "$b" ]] && cmp -s "$a" "$b"
+}
+
+# Refuses (returns 1) when removing <worktree> would lose a file listed in the main repo's
+# .worktreeinclude: one changed in the worktree, or one that exists only there. An unchanged
+# copy is fine, because the main repo still has it. Never prompts and never writes anywhere.
+_gitwt_check_listed_files() {
+  local worktree="$1" main_root="$2" branch="$3"
+  local file
+  local -a changed only
+  changed=(); only=()
+
+  while IFS= read -r -d '' file; do
+    if [[ -e "$main_root/$file" || -L "$main_root/$file" ]]; then
+      _gitwt_same_file "$main_root/$file" "$worktree/$file" || changed+=("$file")
+    else
+      only+=("$file")
+    fi
+  done < <(_gitwt_included_files "$worktree" "$main_root/.worktreeinclude")
+
+  (( ${#changed[@]} + ${#only[@]} > 0 )) || return 0
+
+  echo "Error: removing this worktree would lose files listed in .worktreeinclude." >&2
+  if (( ${#changed[@]} > 0 )); then
+    echo "Changed here, so they differ from the main repo's copy. To compare:" >&2
+    for file in "${changed[@]}"; do
+      echo "  diff $(_gitwt_quote "$main_root/$file") $(_gitwt_quote "$worktree/$file")" >&2
+    done
+  fi
+  if (( ${#only[@]} > 0 )); then
+    echo "Only in this worktree. To keep a copy in the main repo:" >&2
+    local dest dest_dir
+    for file in "${only[@]}"; do
+      dest="$main_root/$file"
+      dest_dir="$(dirname "$dest")"
+      if [[ -d "$dest_dir" ]]; then
+        echo "  cp -p $(_gitwt_quote "$worktree/$file") $(_gitwt_quote "$dest")" >&2
+      else
+        echo "  mkdir -p $(_gitwt_quote "$dest_dir") && cp -p $(_gitwt_quote "$worktree/$file") $(_gitwt_quote "$dest")" >&2
+      fi
+      if ! git -C "$main_root" check-ignore -q -- "$file" 2>/dev/null; then
+        echo "    Careful: '$file' isn't ignored in the main repo, so a copy there could be committed." >&2
+      fi
+    done
+  fi
+  echo "To remove it anyway and lose them: gitwt remove $branch --force" >&2
+  return 1
+}
+
+# Mentions, in one line, the ignored files removal will delete that .worktreeinclude doesn't list,
+# such as node_modules/. They never block removal.
+_gitwt_note_unlisted_ignored() {
+  local worktree="$1" main_root="$2"
+  local entry listed=$'\n' count=0 shown=""
+
+  while IFS= read -r -d '' entry; do
+    listed+="$entry"$'\n'
+  done < <(_gitwt_included_files "$worktree" "$main_root/.worktreeinclude")
+
+  # --directory collapses an ignored folder such as node_modules/ into one entry
+  while IFS= read -r -d '' entry; do
+    [[ "$listed" == *$'\n'"$entry"$'\n'* ]] && continue
+    count=$((count + 1))
+    (( count <= 3 )) && shown="${shown:+$shown, }$entry"
+  done < <(git -C "$worktree" ls-files -z --others --ignored --exclude-standard --directory 2>/dev/null)
+
+  (( count > 0 )) || return 0
+  (( count > 3 )) && shown="$shown, and $((count - 3)) more"
+  echo "Note: also deleting ignored files: $shown" >&2
+  if [[ ! -f "$main_root/.worktreeinclude" ]]; then
+    echo "Tip: to have gitwt check files such as .env before removing, list them in .worktreeinclude." >&2
+  fi
+  return 0
+}
+
 _gitwt_remove() {
-  local branch="" delete_branch=0
+  local branch="" delete_branch=0 force=0
 
   while [[ $# -gt 0 ]]; do
     case "$1" in
       --branch) delete_branch=1 ; shift ;;
+      --force)  force=1 ; shift ;;
       *)        branch="$1" ; shift ;;
     esac
   done
 
   if [[ -z "$branch" ]]; then
-    echo "Usage: gitwt remove <type/branch-name> [--branch]" >&2
+    echo "Usage: gitwt remove <type/branch-name> [--branch] [--force]" >&2
     echo "Example: gitwt remove fix/checkin-timeout-issue-103" >&2
     return 1
   fi
@@ -452,20 +542,46 @@ _gitwt_remove() {
   local worktree_path
   worktree_path="$(_gitwt_find_path "$branch")" || return 1
 
-  local current_dir
-  current_dir="$(pwd)"
-
-  # If we're inside the worktree, jump back to main repo first
-  local main_root
+  local main_root wt_physical main_physical
   main_root="$(_gitwt_main_repo_root)"
-  if [[ "$current_dir" == "$worktree_path"* ]]; then
+  wt_physical="$(cd "$worktree_path" && pwd -P)"
+  main_physical="$(cd "$main_root" && pwd -P)"
+
+  if [[ "$wt_physical" == "$main_physical" ]]; then
+    echo "Error: '$branch' is checked out in the main repo, which isn't a removable worktree." >&2
+    return 1
+  fi
+
+  if (( ! force )); then
+    if [[ -n "$(git -C "$worktree_path" status --porcelain 2>/dev/null)" ]]; then
+      echo "Error: '$branch' has uncommitted changes or untracked files. Commit or stash them first." >&2
+      echo "To remove it anyway: gitwt remove $branch --force (this permanently discards them)." >&2
+      return 1
+    fi
+    _gitwt_check_listed_files "$worktree_path" "$main_root" "$branch" || return 1
+    _gitwt_note_unlisted_ignored "$worktree_path" "$main_root"
+  fi
+
+  # Leave the worktree only now that removal goes ahead. Compare physical paths and whole
+  # path components, so a symlinked path or a sibling like feature-x-2 isn't mistaken for it.
+  local prev_dir="$PWD" inside=0 here
+  here="$(pwd -P)"
+  [[ "$here" == "$wt_physical" || "$here" == "$wt_physical/"* ]] && inside=1
+  if (( inside )); then
     echo "Currently inside worktree — returning to main repo: $main_root"
     cd "$main_root" || return 1
   fi
 
   echo "Removing worktree: $worktree_path"
-  if ! git worktree remove "$worktree_path"; then
-    echo "Tip: if there are uncommitted changes, use: git worktree remove --force $worktree_path" >&2
+  local removed=0
+  if (( force )); then
+    git worktree remove --force "$worktree_path" && removed=1
+  else
+    git worktree remove "$worktree_path" && removed=1
+  fi
+  if (( ! removed )); then
+    # git explains why above (for example, a locked worktree); go back to where you were
+    (( inside )) && [[ -d "$prev_dir" ]] && cd "$prev_dir"
     return 1
   fi
   echo "Worktree removed."
@@ -591,8 +707,12 @@ COMMANDS
   remove <branch-name>        Remove a worktree (looked up from git). If your shell
                               is currently inside it, you'll be cd'd back to the
                               main repo automatically.
+                              Refuses if it would lose uncommitted work, or a file
+                              listed in .worktreeinclude that was changed in the
+                              worktree or exists only there; it says what to do.
                               Flags:
                                 --branch        also delete the local branch
+                                --force         remove anyway, discarding all of that
 
   list                        Show all worktrees with branch, sync state
                               (ahead/behind upstream), changes, and path.
