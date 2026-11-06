@@ -189,21 +189,23 @@ restarting: virtualenvs, build caches, absolute symlinks, or programs still runn
 gitwt list [-s|--short]    # alias: gitwt ls
 ```
 
-Shows every worktree of the repo (columns narrowed here):
+Shows every worktree of the repo, with `*` on the one you're in:
 
 ```text
-BRANCH               SYNC                 CHANGES                    PATH
-───────────────────  ───────────────────  ─────────────────────────  ──────────────────────────────────
-main                 ✓ clean              ✓ clean                    myrepo
-feature/dark-mode    -                    2 modified · 1 untracked   worktrees/myrepo/feature-dark-mode
-fix/login-bug        3 ahead              ✓ clean                    worktrees/myrepo/fix-login-bug
-fix/auth             1 ahead · 2 behind   2 modified                 worktrees/myrepo/fix-auth
-(detached:abc1234)   -                    1 staged                   worktrees/myrepo/some-worktree
+  BRANCH               SYNC                 CHANGES                    PATH
+  ──────────────────   ──────────────────   ────────────────────────   ──────────────────────────────────
+* main                 ✓ clean              ✓ clean                    myrepo
+  feature/dark-mode    -                    2 modified · 1 untracked   worktrees/myrepo/feature-dark-mode
+  fix/login-bug        3 ahead              ✓ clean                    worktrees/myrepo/fix-login-bug
+  fix/auth             1 ahead · 2 behind   2 modified                 worktrees/myrepo/fix-auth
+  (detached:abc1234)   -                    1 staged                   worktrees/myrepo/some-worktree
 ```
+
+Columns are as wide as their contents.
 
 | Column | Shows |
 |---|---|
-| BRANCH | The branch, `(detached:<sha>)`, or `(stale)` for a worktree that's gone from disk |
+| BRANCH | The branch, `(detached:<sha>)`, `(stale)` for a worktree that's gone from disk, or `(bare)` for a bare repo |
 | SYNC | Commits ahead and behind the branch's upstream. `✓ clean` means in step; `-` means no upstream, or detached |
 | CHANGES | Staged, modified and untracked file counts, or `✓ clean` |
 | PATH | Relative to the folder that contains the main repo, or the full path when it's elsewhere |
@@ -219,7 +221,7 @@ $ gitwt ls -s
   (detached:abc1234)   worktrees/myrepo/some-worktree
 ```
 
-The full table runs three git commands for every worktree: two to count commits ahead and behind, and one that reads every file to count changes. With many worktrees, or large ones, that takes a while. `-s` runs a single git command in total, so it's instant however many worktrees there are. It has no header, which also makes it easy to use in scripts.
+The full table runs one `git status` for every worktree, which reads every file to count changes, so it takes longer with many or large worktrees. These run up to 8 at a time. `-s` runs a single git command in total, so it's instant however many worktrees there are. It has no header, which also makes it easy to use in scripts.
 
 ### `gitwt version` and `gitwt help`
 

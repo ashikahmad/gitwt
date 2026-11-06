@@ -321,13 +321,17 @@ Without `--recurse-submodules`, `test/libs/*` is empty and run_tests.sh fails wi
 - test/path_config.bats
 
 ### TASK-019 | Fix gitwt list alignment and bare repo display
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Low  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-06  
 **Tags**: #bug  
 
 Under bash 3.2, printf pads by bytes, so `✓`, `·` and `─` misalign rows (PATH starts at column 93-99; always 99 under zsh in a UTF-8 locale, while `LC_ALL=C` zsh misaligns too). Both shells shift when CHANGES exceeds 30 characters. A bare repo's entry shows as `(detached:)` with `✓ clean`. Newer bash versions were not tested.
+
+**Notes**:
+**Result**: done with TASK-033. Columns now size to their contents, so a long CHANGES value no longer shifts PATH. Padding counts characters rather than bytes, so `✓`, `·` and `─` line up in bash as well as zsh, in any UTF-8 locale; with `LC_ALL=C` a shell can't count them as characters, so rows with `✓` can still be off by 2 there. A bare repo shows as `(bare)` with `-` for SYNC and CHANGES, and no `git status` is run for it. bash 5.2 and zsh 5.9 were checked; bash 3.2 isn't supported (see TASK-015).
 
 ### TASK-020 | Let switch and remove target detached worktrees
 **Status**: backlog  
@@ -453,9 +457,11 @@ Each feature PR documents itself in the README, so after TASK-004 and TASK-023 t
 **Notes**:
 **Design**: a flag rather than a new default, so `gitwt ls` doesn't change for anyone. Like `git status -s`. No header, like `git branch`, so it's easy to use in scripts. The `*` goes on the deepest worktree containing the current folder, logical or physical path, so a worktree inside the main repo is marked instead of the main repo. Unknown options to `ls` are now an error.
 
-**Result**: on a repo with 26 worktrees of 3,000 files each, `gitwt ls` took 250–300 ms and `gitwt ls -s` 7–10 ms, in both bash 5.2 and zsh 5.9. A test checks that `-s` runs exactly one git command with 5 worktrees. Added 7 tests; full suite 135/135 on bash 5.2. Checked by hand under zsh, including completion.
+**Full table, also improved**: one `git status --porcelain=v2 --branch` per worktree instead of two `rev-list --count` and a `git status` (it reports ahead/behind too); these run in parallel, at most 8 at a time, each writing to its own temp file so the order is kept, in a subshell so interactive shells print no job messages; `git worktree list` is read once instead of twice; the helpers set variables instead of being called through `$(...)`, which had cost about a subshell per cell; columns size to their contents and pad by characters; `*` marks the worktree you're in. The values shown are unchanged: compared row by row against the old version on two test repos.
 
-**Related**: TASK-019 (column alignment in the full table) is unchanged.
+**Result**: on a repo with 26 worktrees of 3,000 files each, on 4 cores: `gitwt ls` went from 280–360 ms to 82–91 ms, and `gitwt ls -s` takes 8–10 ms, in both bash 5.2 and zsh 5.9. Tests check that `-s` runs exactly one git command, and that the full table runs one `worktree list` plus one `status` per worktree. Added 14 tests; full suite 142/142 on bash 5.2. Checked by hand in interactive zsh and bash, including completion.
+
+**Related**: TASK-019 (alignment and bare repo display) is done with this.
 
 **Modified files**:
 - gitwt.sh
