@@ -434,25 +434,36 @@ Each feature PR documents itself in the README, so after TASK-004 and TASK-023 t
 - gitwt.sh (help text only)
 
 ### TASK-033 | Add a quick gitwt ls that skips the expensive columns
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-06  
+**Started**: 2026-11-06  
 **Tags**: #feature  
 
-`gitwt ls` is rich but slow with many worktrees or large ones. For each worktree it runs `git rev-list --count` twice (SYNC: ahead/behind upstream) and `git status --porcelain` (CHANGES), which scans every file in the worktree, untracked ones included. That's 3 git commands per worktree on top of one `git worktree list`. A quick version could show branch and path from that single `git worktree list --porcelain` call, plus detached and stale markers, which need no extra git commands.
+`gitwt ls` is rich but slow with many worktrees or large ones. For each worktree it runs `git rev-list --count` twice (SYNC: ahead/behind upstream) and `git status --porcelain` (CHANGES), which scans every file in the worktree, untracked ones included. That's 3 git commands per worktree on top of `git worktree list`, which it runs twice.
 
 **Subtasks**:
-- [ ] Decide the interface: a flag such as `gitwt ls -s` / `--short`, or quick by default with a flag for the full table
-- [ ] Decide what the quick version shows: branch and path only, or also cheap extras such as the current worktree marker
-- [ ] Implement it with one git call in total
-- [ ] Time both versions on a repo with many worktrees, to confirm the difference
-- [ ] Add tests, zsh completion, help text and docs
+- [x] Decide the interface: `gitwt ls -s` / `--short`; plain `gitwt ls` keeps the full table
+- [x] Decide what it shows: branch and path, `*` on the worktree you're in, detached and stale markers, no header
+- [x] Implement it with one git call in total
+- [x] Time both versions on a repo with many worktrees
+- [x] Add tests, zsh completion, help text and docs
 
 **Notes**:
-**Status**: noted for later discussion, 2026-11-06. Nothing decided yet.
+**Design**: a flag rather than a new default, so `gitwt ls` doesn't change for anyone. Like `git status -s`. No header, like `git branch`, so it's easy to use in scripts. The `*` goes on the deepest worktree containing the current folder, logical or physical path, so a worktree inside the main repo is marked instead of the main repo. Unknown options to `ls` are now an error.
 
-**Related**: TASK-019 covers `ls` column alignment and bare repo display, so the two could share work on the table layout.
+**Result**: on a repo with 26 worktrees of 3,000 files each, `gitwt ls` took 250–300 ms and `gitwt ls -s` 7–10 ms, in both bash 5.2 and zsh 5.9. A test checks that `-s` runs exactly one git command with 5 worktrees. Added 7 tests; full suite 135/135 on bash 5.2. Checked by hand under zsh, including completion.
+
+**Related**: TASK-019 (column alignment in the full table) is unchanged.
+
+**Modified files**:
+- gitwt.sh
+- _gitwt
+- test/list.bats
+- docs/usage.md
+- README.md
+- site/index.html
 
 ### TASK-034 | Publish a website with a landing page and the usage guide
 **Status**: in-review  

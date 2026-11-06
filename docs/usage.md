@@ -186,7 +186,7 @@ restarting: virtualenvs, build caches, absolute symlinks, or programs still runn
 ### `gitwt list`
 
 ```text
-gitwt list                 # alias: gitwt ls
+gitwt list [-s|--short]    # alias: gitwt ls
 ```
 
 Shows every worktree of the repo (columns narrowed here):
@@ -209,6 +209,17 @@ fix/auth             1 ahead · 2 behind   2 modified                 worktrees/
 | PATH | Relative to the folder that contains the main repo, or the full path when it's elsewhere |
 
 If any worktree is stale, `list` ends with a tip to run `git worktree prune`.
+
+**`-s` / `--short`** lists just the branch and path, with `*` on the worktree you're in:
+
+```text
+$ gitwt ls -s
+* main                 myrepo
+  feature/dark-mode    worktrees/myrepo/feature-dark-mode
+  (detached:abc1234)   worktrees/myrepo/some-worktree
+```
+
+The full table runs three git commands for every worktree: two to count commits ahead and behind, and one that reads every file to count changes. With many worktrees, or large ones, that takes a while. `-s` runs a single git command in total, so it's instant however many worktrees there are. It has no header, which also makes it easy to use in scripts.
 
 ### `gitwt version` and `gitwt help`
 
@@ -446,7 +457,8 @@ Files gitwt reads:
 - subcommands after `gitwt `,
 - for `new`: local branches that don't have a worktree yet, plus `--from` and `--fetch`; after `--from`, all local branches,
 - for `switch` and `remove`: branches that have a worktree, plus `--branch` for `remove`,
-- for `move`: branches that have a worktree, except the main repo's, then folders for the second argument.
+- for `move`: branches that have a worktree, except the main repo's, then folders for the second argument,
+- for `list`: `-s` and `--short`.
 
 Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command not found: compdef` at startup (TASK-014). bash has no completion yet.
 

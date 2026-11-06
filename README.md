@@ -29,7 +29,7 @@ With raw git you'd need to `git checkout develop && git pull && git checkout -b 
 - **`switch` / `sw`** — jump into any worktree by branch name
 - **`remove`** — tear down a worktree, and optionally its branch; refuses if you'd lose uncommitted work or an edited `.env`, and returns you to the main repo if you're inside it
 - **`move` / `mv`** — move a worktree to another folder, or keep its folder name in step with a renamed branch; everything in it moves as is
-- **`list` / `ls`** — a table of every worktree with its branch, sync with upstream, local changes and path
+- **`list` / `ls`** — a table of every worktree with its branch, sync with upstream, local changes and path; `ls -s` for an instant list of branches and paths
 - **Custom worktree paths** — choose where new worktrees go with a `gitwt.path` template, per repo or for all repos
 - **New worktree setup** — copy ignored files such as `.env` and run a setup script automatically
 - **Zsh tab-completion** via the included `_gitwt` completion script

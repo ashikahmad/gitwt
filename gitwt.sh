@@ -12,7 +12,7 @@ gitwt() {
     remove)            _gitwt_remove "${@:2}" ;;
     switch|sw)         _gitwt_switch "${@:2}" ;;
     move|mv)           _gitwt_move   "${@:2}" ;;
-    list|ls)           _gitwt_list ;;
+    list|ls)           _gitwt_list   "${@:2}" ;;
     version|--version|-v) echo "gitwt $GITWT_VERSION" ;;
     help|*)            _gitwt_help ;;
   esac
@@ -768,7 +768,79 @@ _gitwt_move() {
   echo "restarting: virtualenvs, build caches, absolute symlinks, or programs still running there."
 }
 
+# `gitwt ls -s`: branch and path only, from a single `git worktree list` and no per-worktree
+# git commands, so it stays instant however many or large the worktrees are.
+_gitwt_list_short() {
+  local line wt="" head="" branch="" main_root="" label width=6 stale=0
+  local -a rows
+  rows=()
+
+  while IFS= read -r line; do
+    case "$line" in
+      "worktree "*) wt="${line#worktree }"; [[ -z "$main_root" ]] && main_root="$wt" ;;
+      "HEAD "*)     head="${line#HEAD }" ;;
+      "branch "*)   branch="${line#branch refs/heads/}" ;;
+      "bare")       branch="(bare)" ;;
+      "")
+        if [[ -n "$wt" ]]; then
+          if [[ ! -d "$wt" ]]; then label="(stale)"; stale=1
+          elif [[ -n "$branch" ]]; then label="$branch"
+          else label="(detached:${head:0:7})"
+          fi
+          rows+=("$label"$'\t'"$wt")
+          (( ${#label} > width )) && width=${#label}
+        fi
+        wt=""; head=""; branch="" ;;
+    esac
+  done < <(git worktree list --porcelain 2>/dev/null)
+
+  if [[ -z "$main_root" ]]; then
+    echo "Error: not inside a git repo." >&2
+    return 1
+  fi
+
+  # Mark the worktree you're in: the deepest one containing the current folder
+  local here="$PWD" here_physical entry current=""
+  here_physical="$(pwd -P)"
+  for entry in "${rows[@]}"; do
+    wt="${entry#*$'\t'}"
+    if [[ "$here" == "$wt" || "$here" == "$wt/"* || "$here_physical" == "$wt" || "$here_physical" == "$wt/"* ]]; then
+      (( ${#wt} > ${#current} )) && current="$wt"
+    fi
+  done
+
+  local parent="${main_root%/*}" rel mark
+  for entry in "${rows[@]}"; do
+    label="${entry%%$'\t'*}"
+    wt="${entry#*$'\t'}"
+    rel="$wt"
+    [[ "$wt" == "$parent/"* ]] && rel="${wt#"$parent/"}"
+    mark=" "
+    [[ "$wt" == "$current" ]] && mark="*"
+    printf '%s %-*s  %s\n' "$mark" "$width" "$label" "$rel"
+  done
+
+  if (( stale )); then
+    echo ""
+    echo "Tip: stale entries detected — run 'git worktree prune' to clean up."
+  fi
+}
+
 _gitwt_list() {
+  local short=0
+  while [[ $# -gt 0 ]]; do
+    case "$1" in
+      -s|--short) short=1 ; shift ;;
+      *)
+        echo "Error: unknown option '$1'. Usage: gitwt list [-s|--short]" >&2
+        return 1 ;;
+    esac
+  done
+  if (( short )); then
+    _gitwt_list_short
+    return
+  fi
+
   local main_root
   main_root="$(_gitwt_main_repo_root 2>/dev/null)"
   if [[ -z "$main_root" ]]; then
@@ -892,8 +964,10 @@ COMMANDS
                               the branch (e.g. after 'git branch -m'). If you're inside,
                               you move with it. Alias: mv
 
-  list                        Show all worktrees with branch, sync state
+  list [-s|--short]           Show all worktrees with branch, sync state
                               (ahead/behind upstream), changes, and path.
+                              -s, --short: branch and path only, instantly,
+                              with * on the worktree you're in.
                               Alias: ls
 
   version                     Show the current gitwt version.
