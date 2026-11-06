@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 34 -->
+<!-- Config: Last Task ID: 35 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -493,3 +493,29 @@ gitwt has no website. The README and usage guide are only readable on GitHub.
 - site/ (new)
 - .github/workflows/pages.yml (new)
 
+### TASK-035 | Pick a worktree to switch to with gitwt sw and no branch name
+**Status**: backlog  
+**Priority**: Medium  
+**Category**: CLI  
+**Created**: 2026-11-06  
+**Tags**: #feature  
+
+Switching needs the branch name typed out. `gitwt sw` with no branch only prints a usage error, so it's free to become a picker.
+
+**Subtasks**:
+- [ ] With fzf installed, open it: type to filter, arrows to move, Enter to switch, Esc to cancel
+- [ ] Without fzf, show a numbered menu and read a number
+- [ ] Mark the worktree you're in, and leave out stale entries
+- [ ] Build the list from the single `git worktree list` call that `ls -s` uses (TASK-033), so it opens instantly
+- [ ] Without a terminal, stay an error instead of waiting for input
+- [ ] Let people turn fzf off, e.g. a `gitwt.picker` setting
+- [ ] Add tests, help text and docs, including the zsh tip below
+
+**Notes**:
+**Design**: fzf is optional; gitwt never requires it. Numbers in `ls -s` with `gitwt sw 2` were considered and rejected: numbers shift when worktrees come and go, and a branch can be named `2`.
+
+**Already possible without code**: with `zstyle ':completion:*' menu select` in `~/.zshrc`, `gitwt sw <TAB>` lets you pick a branch with the arrow keys. Worth a tip in the guide either way.
+
+**Later**: an opt-in keyboard shortcut, such as Ctrl-G, that opens the picker from anywhere.
+
+**Related**: TASK-033 (`ls -s`), TASK-020 (switching to detached worktrees).
