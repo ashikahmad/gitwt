@@ -34,17 +34,21 @@ Then open a new terminal, or run `source ~/.zshrc` (or `~/.bashrc`).
 The installer:
 
 - puts `gitwt.sh` and `_gitwt` in `~/.config/gitwt/`, downloaded from this version's release tag, so a version always installs the same files,
-- adds the lines that load them to `~/.zshrc` and/or `~/.bashrc`, whichever exist (zsh also gets tab-completion). With neither, it creates one for your login shell. It respects `ZDOTDIR`,
-- skips a line that's already there, however it's written (`~/` or `$HOME/`, `source` or `.`), but not one that's commented out,
-- needs `curl` or `wget`, and checks that what it downloaded is really gitwt before installing anything.
+- adds the lines that load them to the config of your login shell (`~/.zshrc` or `~/.bashrc`, created if missing), and of the other shell if its config exists. zsh also gets tab-completion; a `.zshrc` it creates turns on `compinit` for that. It respects `ZDOTDIR`, even when set in `~/.zshenv`,
+- skips a line that's already there, however it's written (`~/`, `$HOME/` or the full path, `source` or `.`, in `.zshrc` or `.zprofile`), but not one that's commented out,
+- leaves alone installed files that are links to another copy, or part of a git clone at `~/.config/gitwt` (update those with `git pull`),
+- needs bash, and `curl` or `wget`, and checks that what it downloaded is really gitwt before installing anything.
 
 **To read it first:**
 
 ```bash
-curl -fsSL -o install.sh https://raw.githubusercontent.com/ashikahmad/gitwt/main/install.sh
+cd "$(mktemp -d)"
+curl -fsSLO https://raw.githubusercontent.com/ashikahmad/gitwt/main/install.sh
 less install.sh
 bash install.sh
 ```
+
+It's run from an empty temporary folder because, next to a `gitwt.sh` and `_gitwt`, the installer installs those instead of downloading.
 
 **From a clone:** `git clone https://github.com/ashikahmad/gitwt.git && bash gitwt/install.sh`. This copies the clone's files instead of downloading, so it installs whatever the clone has checked out.
 
@@ -54,12 +58,11 @@ bash install.sh
 
 ```bash
 mkdir -p ~/.config/gitwt
-cd ~/.config/gitwt
-curl -fsSLO https://raw.githubusercontent.com/ashikahmad/gitwt/main/gitwt.sh
-curl -fsSLO https://raw.githubusercontent.com/ashikahmad/gitwt/main/_gitwt
+curl -fsSL -o ~/.config/gitwt/gitwt.sh https://raw.githubusercontent.com/ashikahmad/gitwt/v0.2.0/gitwt.sh
+curl -fsSL -o ~/.config/gitwt/_gitwt   https://raw.githubusercontent.com/ashikahmad/gitwt/v0.2.0/_gitwt
 ```
 
-Then add to `~/.zshrc` or `~/.bashrc`:
+(`v0.2.0` is this version's tag; the one-line install uses the same files.) Then add to `~/.zshrc` or `~/.bashrc`:
 
 ```bash
 source "$HOME/.config/gitwt/gitwt.sh"
@@ -495,7 +498,7 @@ Files gitwt reads:
 - for `move`: branches that have a worktree, except the main repo's, then folders for the second argument,
 - for `list`: `-l`, `--long`, `-s` and `--short`.
 
-Source it after `compinit` in `~/.zshrc`; the installer adds it at the end, which is after `compinit` in most setups. If `compinit` hasn't run, completion is skipped quietly rather than printing an error. bash has no completion yet.
+Source it after `compinit` in `~/.zshrc`; the installer adds it at the end, which is after `compinit` in most setups. A `.zshrc` the installer creates runs `compinit` first, and if an existing one doesn't seem to, the installer says how to turn it on. If `compinit` hasn't run, completion is skipped quietly rather than printing an error. bash has no completion yet.
 
 ---
 
