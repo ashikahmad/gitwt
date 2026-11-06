@@ -77,7 +77,23 @@ gitwt has no move or rename command. `git branch -m` works and `gitwt sw` still 
 - [ ] Decide the interface, e.g. `gitwt move <branch> [path]`
 - [ ] Keep the folder name in step with a renamed branch
 - [ ] Give a clear error for the main worktree and submodule cases
+- [ ] Explain the other cases git refuses: destination exists, locked worktree, another drive
+- [ ] Create missing parent folders, since git doesn't
+- [ ] Move your shell to the new path if you're inside the worktree
+- [ ] Print one generic note after moving about things that saved the old full path
 - [ ] Add tests, zsh completion and docs
+
+**Notes**:
+**Findings** (git 2.43, 2026-11-06): `git worktree move` renames the folder in one step, so staged, modified, untracked and ignored files, `.env` included, all arrive as they were, and `git status` reads the same afterwards. It needs no `--force` for a dirty worktree. A failed move changes nothing: moving to another filesystem fails with "Invalid cross-device link" and leaves the worktree in place and registered. git also refuses a locked worktree (unless `-f -f`), the main worktree, worktrees with submodules, an existing destination, and a destination whose parent folder doesn't exist.
+
+**Design**: nothing is deleted, so the `.worktreeinclude` checks from TASK-001 aren't needed, and the setup script isn't rerun. What can break is anything that saved the worktree's full path: in testing, an absolute symlink broke and a relative one didn't; virtualenvs, some build caches and tool settings do the same, and running programs keep the old path. Rather than detect specific tools, which would miss the rest and suggest the list is complete, gitwt prints one generic note after every move:
+
+```text
+Files are unchanged. Anything that saved the old full path may need recreating or
+restarting: virtualenvs, build caches, absolute symlinks, or programs still running there.
+```
+
+The usage guide explains it in more detail.
 
 ### TASK-004 | Automate new worktree setup with .worktreeinclude and a post-create hook
 **Status**: done  
