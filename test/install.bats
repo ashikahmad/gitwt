@@ -481,10 +481,21 @@ _on_macos() { printf '#!/bin/sh\necho Darwin\n' > "$T/bin/uname"; chmod +x "$T/b
 
 @test "install: warns when the login shell is a bash older than 4" {
   mkdir -p "$T/oldbash"
-  printf '#!/bin/sh\necho 3\n' > "$T/oldbash/bash"; chmod +x "$T/oldbash/bash"
+  printf '#!/bin/sh\necho 3.2\n' > "$T/oldbash/bash"; chmod +x "$T/oldbash/bash"
   SHELL="$T/oldbash/bash" install_piped
   assert_success
-  assert_output --partial "your shell is bash 3, but gitwt needs zsh or bash 4"
+  assert_output --partial "Warning: your shell is bash 3.2, which gitwt doesn't support"
+  assert_output --partial "chsh -s /bin/zsh"
+}
+
+@test "install: no bash version warning for a zsh user, or a bash 4+ user" {
+  : > "$HOME/.zshrc"; : > "$HOME/.bashrc"
+  install_piped
+  assert_success
+  refute_output --partial "doesn't support"
+  SHELL="$(command -v bash)" install_piped
+  assert_success
+  refute_output --partial "doesn't support"
 }
 
 @test "install: piped from a folder with files named main, gitwt.sh and _gitwt, still downloads" {

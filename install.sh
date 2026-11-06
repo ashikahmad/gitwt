@@ -362,13 +362,17 @@ wire_bash() {
   fi
 }
 
-# gitwt needs bash 4 or newer; macOS's /bin/bash is 3.2.
+# gitwt needs zsh or bash 4 or newer. Only the login shell matters: on a Mac this script
+# itself always runs in /bin/bash 3.2, whatever shell the user has.
 check_bash_version() {
   local v
-  v="$("$SHELL" -c 'echo "${BASH_VERSINFO[0]}"' 2>/dev/null </dev/null || true)"
-  if [[ "$v" =~ ^[0-9]+$ ]] && (( v < 4 )); then
-    yellow "Note: your shell is bash $v, but gitwt needs zsh or bash 4 or newer. macOS's own"
-    yellow "bash is 3.2; switch to zsh (chsh -s /bin/zsh), or install a newer bash."
+  v="$("$SHELL" -c 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"' 2>/dev/null </dev/null || true)"
+  if [[ "$v" =~ ^[0-9]+\.[0-9]+$ ]] && (( ${v%%.*} < 4 )); then
+    yellow "Warning: your shell is bash $v, which gitwt doesn't support: it needs zsh, or bash 4"
+    yellow "or newer. In bash $v, gitwt ls fails and other commands are untested. Either:"
+    yellow "  - switch to zsh, macOS's default shell since 10.15:  chsh -s /bin/zsh"
+    yellow "    (then run this installer again, so ~/.zshrc loads gitwt), or"
+    yellow "  - install a newer bash, e.g. brew install bash, and make it your shell."
     echo ""
   fi
 }
