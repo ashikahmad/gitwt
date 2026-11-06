@@ -25,7 +25,7 @@ install_piped() {
 
 # Runs install.sh from the clone.
 install_from_clone() {
-  run bash "$REPO_ROOT/install.sh"
+  run env PATH="$T/bin:$PATH" bash "$REPO_ROOT/install.sh"
 }
 
 @test "install: the version in install.sh matches gitwt.sh" {
@@ -192,7 +192,7 @@ install_from_clone() {
   sed 's/-o) out="$2"; shift 2/-O) out="$2"; shift 2/' "$T/bin/curl" > "$T/bin/wget"
   chmod +x "$T/bin/wget"; rm "$T/bin/curl"
   mkdir -p "$T/nocurl"
-  for tool in bash cat grep sed mktemp rm rmdir mkdir cp mv cmp head dirname tr sleep readlink; do
+  for tool in bash cat grep sed mktemp rm rmdir mkdir cp mv cmp head dirname tr sleep readlink awk uname; do
     ln -s "$(command -v "$tool")" "$T/nocurl/$tool"
   done
   run env PATH="$T/bin:$T/nocurl" bash -c "cd '$T' && cat '$REPO_ROOT/install.sh' | bash"
@@ -399,14 +399,18 @@ _recognises() {
   [[ ! -e "$HOME/.zshrc" ]]
 }
 
-@test "install: lines an older install put in .zprofile count, so they aren't loaded twice" {
+@test "install: lines an older install put in .zprofile don't stop .zshrc getting them" {
+  command -v zsh >/dev/null || skip "zsh not installed"
   printf 'source "%s/.config/gitwt/gitwt.sh"\nsource "%s/.config/gitwt/_gitwt"\n' "$HOME" "$HOME" > "$HOME/.zprofile"
+  printf 'autoload -Uz compinit && compinit\n' > "$HOME/.zshrc"
   install_piped
   assert_success
-  assert_output --partial "$HOME/.zprofile: already loads gitwt.sh"
-  [[ ! -e "$HOME/.zshrc" ]]
-  assert_output --partial "Open a new terminal to start using it."
-  refute_output --partial "source $HOME/.zshrc"
+  assert_output --partial "$HOME/.zprofile also loads gitwt"
+  grep -qxF 'source "$HOME/.config/gitwt/_gitwt"' "$HOME/.zshrc"
+  # A non-login zsh (Linux terminals) has gitwt, and completion is on
+  run env HOME="$HOME" zsh -i -c 'whence -w gitwt; echo "comp=${_comps[gitwt]:-NONE}"' </dev/null
+  assert_output --partial "gitwt: function"
+  assert_output --partial "comp=_gitwt"
 }
 
 @test "install: the guide's by-hand steps download this version's tag" {
@@ -414,5 +418,180 @@ _recognises() {
   run grep -c "raw.githubusercontent.com/ashikahmad/gitwt/v$v/" "$REPO_ROOT/docs/usage.md"
   assert_output "2"
   run grep -E 'raw.githubusercontent.com/ashikahmad/gitwt/main/(gitwt\.sh|_gitwt)' "$REPO_ROOT/docs/usage.md"
+  assert_failure
+}
+
+# ── second review of PR #10 ────────────────────────────────────────────────────
+
+@test "install: completion still registers when the gitwt lines come before compinit" {
+  command -v zsh >/dev/null || skip "zsh not installed"
+  printf 'source "$HOME/.config/gitwt/gitwt.sh"\nsource "$HOME/.config/gitwt/_gitwt"\nautoload -Uz compinit && compinit\n' > "$HOME/.zshrc"
+  install_piped
+  assert_success
+  # precmd hooks run before each prompt; run them by hand as a prompt would
+  run env HOME="$HOME" zsh -c 'source ~/.zshrc; for f in $precmd_functions; do $f; done; echo "comp=${_comps[gitwt]:-NONE}"'
+  assert_success
+  assert_output --partial "comp=_gitwt"
+  refute_output --partial "command not found"
+}
+
+# A fake uname that says this is a Mac.
+_on_macos() { printf '#!/bin/sh\necho Darwin\n' > "$T/bin/uname"; chmod +x "$T/bin/uname"; }
+
+@test "install: on macOS, a bash user's .bash_profile loads gitwt too" {
+  _on_macos
+  printf 'export PATH="$HOME/bin:$PATH"\n' > "$HOME/.bash_profile"
+  SHELL=/bin/bash install_piped
+  assert_success
+  grep -qxF 'source "$HOME/.config/gitwt/gitwt.sh"' "$HOME/.bash_profile"
+  grep -qxF 'source "$HOME/.config/gitwt/gitwt.sh"' "$HOME/.bashrc"
+  # A login shell, as macOS terminals start, has gitwt
+  run env HOME="$HOME" bash -l -i -c 'type -t gitwt' </dev/null
+  assert_output --partial "function"
+}
+
+@test "install: on macOS with no bash config at all, creates .bash_profile too" {
+  _on_macos
+  SHELL=/bin/bash install_piped
+  assert_success
+  grep -qxF 'source "$HOME/.config/gitwt/gitwt.sh"' "$HOME/.bash_profile"
+}
+
+@test "install: a .bash_profile that reads .bashrc gets no line of its own" {
+  _on_macos
+  printf '[ -f ~/.bashrc ] && . ~/.bashrc\n' > "$HOME/.bash_profile"
+  SHELL=/bin/bash install_piped
+  assert_success
+  ! grep -q gitwt "$HOME/.bash_profile"
+  run env HOME="$HOME" bash -l -i -c 'type -t gitwt' </dev/null
+  assert_output --partial "function"
+}
+
+@test "install: a line added to .profile loads only in bash, so sh still starts" {
+  _on_macos
+  printf 'export EDITOR=vi\n' > "$HOME/.profile"
+  SHELL=/bin/bash install_piped
+  assert_success
+  grep -q 'BASH_VERSION' "$HOME/.profile"
+  run env HOME="$HOME" sh -c '. "$HOME/.profile"; echo sh-ok'
+  assert_output "sh-ok"
+  run env HOME="$HOME" bash -l -i -c 'type -t gitwt' </dev/null
+  assert_output --partial "function"
+}
+
+@test "install: warns when the login shell is a bash older than 4" {
+  mkdir -p "$T/oldbash"
+  printf '#!/bin/sh\necho 3\n' > "$T/oldbash/bash"; chmod +x "$T/oldbash/bash"
+  SHELL="$T/oldbash/bash" install_piped
+  assert_success
+  assert_output --partial "your shell is bash 3, but gitwt needs zsh or bash 4"
+}
+
+@test "install: piped from a folder with files named main, gitwt.sh and _gitwt, still downloads" {
+  : > "$HOME/.zshrc"
+  mkdir -p "$T/cwd"
+  printf 'x\n' > "$T/cwd/main"; printf 'echo EVIL\n' > "$T/cwd/gitwt.sh"; printf 'x\n' > "$T/cwd/_gitwt"
+  run env PATH="$T/bin:$PATH" bash -c "cd '$T/cwd' && cat '$REPO_ROOT/install.sh' | bash"
+  assert_success
+  assert_output --partial "From: https://raw.githubusercontent.com/"
+  cmp -s "$REPO_ROOT/gitwt.sh" "$HOME/.config/gitwt/gitwt.sh"
+}
+
+@test "install: files next to the script that aren't gitwt's install nothing" {
+  : > "$HOME/.zshrc"
+  mkdir -p "$T/fake"
+  cp "$REPO_ROOT/install.sh" "$T/fake/"
+  printf 'echo EVIL\n' > "$T/fake/gitwt.sh"; printf 'x\n' > "$T/fake/_gitwt"
+  run bash "$T/fake/install.sh"
+  assert_failure 1
+  assert_output --partial "isn't gitwt"
+  [[ ! -e "$HOME/.config/gitwt/gitwt.sh" ]]
+}
+
+@test "install: sourced from zsh or sh, it doesn't close the shell" {
+  run sh -c ". '$REPO_ROOT/install.sh'; echo still-here"
+  assert_output --partial "still-here"
+  if command -v zsh >/dev/null; then
+    run zsh -f -c "source '$REPO_ROOT/install.sh'; echo still-here"
+    assert_output --partial "still-here"
+  fi
+}
+
+@test "install: an installed file that links to nothing is replaced" {
+  : > "$HOME/.zshrc"
+  mkdir -p "$HOME/.config/gitwt"
+  ln -s "$T/deleted-clone/gitwt.sh" "$HOME/.config/gitwt/gitwt.sh"
+  install_piped
+  assert_success
+  assert_output --partial "is installed"
+  [[ ! -L "$HOME/.config/gitwt/gitwt.sh" ]]
+  cmp -s "$REPO_ROOT/gitwt.sh" "$HOME/.config/gitwt/gitwt.sh"
+}
+
+@test "install: whatever ~/.zshenv prints doesn't end up in the config path" {
+  command -v zsh >/dev/null || skip "zsh not installed"
+  printf 'echo "hello from zshenv"\n' > "$HOME/.zshenv"
+  install_piped
+  assert_success
+  grep -qxF 'source "$HOME/.config/gitwt/gitwt.sh"' "$HOME/.zshrc"
+  run ls -A "$T"
+  refute_output --partial "hello"
+}
+
+@test "install: a lock left by an install that was killed doesn't block the next one" {
+  : > "$HOME/.zshrc"
+  mkdir -p "$HOME/.config/gitwt/.install-lock"
+  bash -c 'echo $$' > "$HOME/.config/gitwt/.install-lock/pid"   # a pid that has exited
+  SECONDS=0
+  install_piped
+  assert_success
+  (( SECONDS < 5 ))
+  [[ ! -e "$HOME/.config/gitwt/.install-lock" ]]
+}
+
+@test "install: the hint says which shell each line is for" {
+  : > "$HOME/.zshrc"; : > "$HOME/.bashrc"
+  install_piped
+  assert_success
+  assert_output --partial "source $HOME/.zshrc    # in zsh"
+  assert_output --partial "source $HOME/.bashrc    # in bash"
+}
+
+@test "install: recognises more ways of loading gitwt" {
+  local line bad=()
+  local lines=(
+    'source "${XDG_CONFIG_HOME:-$HOME/.config}/gitwt/gitwt.sh"'
+    'source ${XDG_CONFIG_HOME:-~/.config}/gitwt/gitwt.sh'
+    'if source ~/.config/gitwt/gitwt.sh; then :; fi'
+    'source ~/.config/gitwt/gitwt.sh>/dev/null'
+    'builtin source ~/.config/gitwt/gitwt.sh'
+    'command . ~/.config/gitwt/gitwt.sh'
+    'source -- ~/.config/gitwt/gitwt.sh'
+    'echo "#"; source ~/.config/gitwt/gitwt.sh'
+    '{ source ~/.config/gitwt/gitwt.sh; }'
+  )
+  for line in "${lines[@]}"; do
+    _recognises "$line" || bad+=("$line")
+  done
+  (( ${#bad[@]} == 0 )) || { printf 'not recognised: %s\n' "${bad[@]}"; false; }
+}
+
+@test "install: doesn't mistake quoted text for a line that loads gitwt" {
+  local line bad=() r
+  local lines=(
+    'echo "tip; source ~/.config/gitwt/gitwt.sh"'
+    "alias reload='cd; source ~/.config/gitwt/gitwt.sh'"
+    "echo 'Run: (source ~/.config/gitwt/gitwt.sh)'"
+    'alias gw="source ~/.config/gitwt/gitwt.sh"'
+  )
+  for line in "${lines[@]}"; do
+    _recognises "$line" && r=0 || r=$?
+    [[ "$r" == 1 ]] || bad+=("$line")
+  done
+  (( ${#bad[@]} == 0 )) || { printf 'wrongly recognised: %s\n' "${bad[@]}"; false; }
+}
+
+@test "install: install.sh uses no bash 4 features (macOS pipes it into bash 3.2)" {
+  run grep -nE 'declare -A|local -A|typeset -A|mapfile|readarray|\$\{[a-zA-Z_]+(,,|\^\^)|;;&|;&$|local -n|declare -n|printf -v|\|&|&>>|coproc' "$REPO_ROOT/install.sh"
   assert_failure
 }

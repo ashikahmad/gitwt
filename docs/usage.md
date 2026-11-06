@@ -35,7 +35,8 @@ The installer:
 
 - puts `gitwt.sh` and `_gitwt` in `~/.config/gitwt/`, downloaded from this version's release tag, so a version always installs the same files,
 - adds the lines that load them to the config of your login shell (`~/.zshrc` or `~/.bashrc`, created if missing), and of the other shell if its config exists. zsh also gets tab-completion; a `.zshrc` it creates turns on `compinit` for that. It respects `ZDOTDIR`, even when set in `~/.zshenv`,
-- skips a line that's already there, however it's written (`~/`, `$HOME/` or the full path, `source` or `.`, in `.zshrc` or `.zprofile`), but not one that's commented out,
+- for bash on macOS, whose terminals start login shells, also adds the line to `~/.bash_profile` (or `.bash_login` or `.profile`, whichever bash reads), unless that file already reads `~/.bashrc`. It warns if your bash is older than 4, which gitwt needs; macOS's own bash is 3.2,
+- skips a line that's already there, written any common way (`~/`, `$HOME/`, the full path or `$XDG_CONFIG_HOME/`; `source` or `.`), but not one that's commented out or inside quotes. If an older install put the lines in `.zprofile`, it adds them to `.zshrc` too and says you can delete the old ones,
 - leaves alone installed files that are links to another copy, or part of a git clone at `~/.config/gitwt` (update those with `git pull`),
 - needs bash, and `curl` or `wget`, and checks that what it downloaded is really gitwt before installing anything.
 
@@ -69,7 +70,7 @@ source "$HOME/.config/gitwt/gitwt.sh"
 source "$HOME/.config/gitwt/_gitwt"   # zsh only, after compinit
 ```
 
-**To update**, run the install command again. It replaces the two files and adds nothing twice.
+**To update**, run the install command again. It replaces the two files and adds nothing twice. Files it left alone (links to another copy, or a git clone at `~/.config/gitwt`) are updated where they live, for example with `git -C ~/.config/gitwt pull`.
 
 **A shorter name:** `alias gwt=gitwt` in your shell config.
 
@@ -498,7 +499,7 @@ Files gitwt reads:
 - for `move`: branches that have a worktree, except the main repo's, then folders for the second argument,
 - for `list`: `-l`, `--long`, `-s` and `--short`.
 
-Source it after `compinit` in `~/.zshrc`; the installer adds it at the end, which is after `compinit` in most setups. A `.zshrc` the installer creates runs `compinit` first, and if an existing one doesn't seem to, the installer says how to turn it on. If `compinit` hasn't run, completion is skipped quietly rather than printing an error. bash has no completion yet.
+Source it after `compinit` in `~/.zshrc`; the installer adds it at the end, which is after `compinit` in most setups. A `.zshrc` the installer creates runs `compinit` first, and if an existing one doesn't seem to, the installer says how to turn it on. If `compinit` hasn't run yet when it loads (it comes later in `.zshrc`, or a plugin manager defers it), completion is turned on at the first prompt after `compinit` has run, rather than printing an error. bash has no completion yet.
 
 ---
 
