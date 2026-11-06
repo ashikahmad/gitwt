@@ -3,7 +3,7 @@
 Everything gitwt does, how to use it, and what happens when something goes wrong. For a short overview, see the [README](../README.md).
 
 - [Install](#install)
-- [Commands](#commands): [`new`](#gitwt-new), [`switch`](#gitwt-switch), [`remove`](#gitwt-remove), [`list`](#gitwt-list), [`version` and `help`](#gitwt-version-and-gitwt-help)
+- [Commands](#commands): [`new`](#gitwt-new), [`switch`](#gitwt-switch), [`remove`](#gitwt-remove), [`move`](#gitwt-move), [`list`](#gitwt-list), [`version` and `help`](#gitwt-version-and-gitwt-help)
 - [Where worktrees go](#where-worktrees-go)
 - [Setting up new worktrees](#setting-up-new-worktrees)
 - [How it fits together](#how-it-fits-together)
@@ -131,6 +131,54 @@ To remove it anyway and lose them: gitwt remove feature/x --force
 - **`--branch`** also deletes the local branch, with `git branch -d`, so a branch with unmerged commits is kept. To delete it anyway: `git branch -D <branch>`.
 - **The main repo can't be removed.** `gitwt remove main`, when `main` is checked out in the main repo, is refused.
 - **Only the main repo's copy is compared.** gitwt doesn't check other worktrees, and `.worktreeinclude` is read from the main repo, the same list used when [copying files in](#copy-ignored-files-worktreeinclude).
+
+### `gitwt move`
+
+```text
+gitwt move <branch> [<new-path>]      # alias: gitwt mv
+```
+
+Moves the worktree that has `<branch>` checked out to another folder.
+
+```bash
+git branch -m feature/old feature/new
+gitwt move feature/new                       # folder follows: feature-old → feature-new
+gitwt move feature/new ~/archive/            # into ~/archive/, as feature-new
+gitwt move feature/new ../somewhere-else     # to exactly ../somewhere-else
+```
+
+- **Without `<new-path>`,** it goes where [`gitwt.path`](#where-worktrees-go) puts that branch. Use this after renaming a branch with `git branch -m`, or after changing `gitwt.path`.
+- **With `<new-path>`,** a relative path starts from your current folder. If it's an existing folder, or ends in `/`, the worktree goes inside it, keeping its folder name, like `mv`.
+- **Missing parent folders are created,** and removed again if the move fails.
+- **If you're inside the worktree,** you're moved with it, to the same subfolder.
+
+**Everything moves as it is.** git renames the folder in one step, so staged, modified, untracked and ignored files, `.env` included, all arrive unchanged, and `git status` reads the same afterwards. There's nothing to check first, and a failed move changes nothing.
+
+**What can break** is anything that saved the worktree's old full path. gitwt says so after every move:
+
+```text
+Done. Files are unchanged. Anything that saved the old full path may need recreating or
+restarting: virtualenvs, build caches, absolute symlinks, or programs still running there.
+```
+
+| Thing | What to do |
+|---|---|
+| Python virtualenv inside the worktree | Recreate it, e.g. `rm -rf .venv && python -m venv .venv`, then reinstall |
+| Build folders that store full paths (CMake, some caches) | Clean and rebuild |
+| Symlinks pointing at the old full path | Recreate them; relative symlinks are fine |
+| Editors, dev servers or shells open in the old folder | Reopen or restart them there |
+| The setup script | Isn't rerun; run it by hand if it's needed |
+
+**Refused, with nothing changed:**
+
+| Case | Why |
+|---|---|
+| The main repo's branch | The main repo can't be moved with gitwt |
+| Destination already exists | Without `<new-path>`, it also says which branch or repo has the folder |
+| Destination inside the worktree itself | Can't move a folder into itself |
+| A locked worktree | Unlock it with `git worktree unlock <path>` if the lock is no longer needed |
+| Another drive | git can only move within one drive. Push or commit, remove the worktree, and create it again there |
+| A worktree with submodules | git doesn't support it. Push or commit, remove it, and create it again |
 
 ### `gitwt list`
 
@@ -394,7 +442,7 @@ Files gitwt reads:
 
 - subcommands after `gitwt `,
 - for `new`: local branches that don't have a worktree yet, plus `--from` and `--fetch`; after `--from`, all local branches,
-- for `switch` and `remove`: branches that have a worktree, plus `--branch` for `remove`.
+- for `switch`, `remove` and `move`: branches that have a worktree, plus `--branch` for `remove`, and folders for `move`'s second argument.
 
 Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command not found: compdef` at startup (TASK-014). bash has no completion yet.
 
@@ -421,6 +469,10 @@ Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command
 | `gitwt.postCreate must be a path inside the repo` | The path is absolute or uses `..` | Use a path relative to the repo root |
 | `… failed. The worktree was still created.` | The setup script exited with an error | Fix it and run it by hand in the worktree |
 | `no worktree found for branch 'x'` | `x` has no worktree | `gitwt list` |
+| `'x' is already at: …` | `move` without a path, and it's already where `gitwt.path` puts it | Nothing to do |
+| `is on a different drive` | `move` across drives isn't possible | Remove it and create it again there |
+| `is locked, so git won't move it` | Someone locked the worktree | `git worktree unlock <path>` if that's safe |
+| `can't move a worktree that contains submodules` | A git limitation | Remove it and create it again there |
 | `worktree path no longer exists` | The folder was deleted outside git | `git worktree prune` |
 | `'x' has uncommitted changes or untracked files` | `remove` won't discard work | Commit or stash, or `gitwt remove x --force` if you're sure |
 | `removing this worktree would lose files listed in .worktreeinclude` | A listed file was changed in the worktree, or exists only there | Run the `diff` or `cp` commands it prints, then remove again; or `--force` |

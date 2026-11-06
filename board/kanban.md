@@ -73,23 +73,24 @@ When removal fails, gitwt.sh:244 suggests `git worktree remove --force` whatever
 **Plan**: done as part of TASK-001, which adds `gitwt remove --force` and rewrites this tip.
 
 ### TASK-003 | Add gitwt move to relocate or rename a worktree
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-06  
 **Tags**: #feature  
 
 gitwt has no move or rename command. `git branch -m` works and `gitwt sw` still finds the branch, but the folder keeps the old name (`feature/new` stays in `feature-old`). `git worktree move` works and gitwt picks up the new path, but it has to be run by hand. Git cannot move the main worktree or one containing submodules.
 
 **Subtasks**:
-- [ ] Decide the interface, e.g. `gitwt move <branch> [path]`
-- [ ] Keep the folder name in step with a renamed branch
-- [ ] Give a clear error for the main worktree and submodule cases
-- [ ] Explain the other cases git refuses: destination exists, locked worktree, another drive
-- [ ] Create missing parent folders, since git doesn't
-- [ ] Move your shell to the new path if you're inside the worktree
-- [ ] Print one generic note after moving about things that saved the old full path
-- [ ] Add tests, zsh completion and docs
+- [x] Decide the interface: `gitwt move <branch> [<new-path>]`, alias `mv`
+- [x] Keep the folder name in step with a renamed branch
+- [x] Give a clear error for the main worktree and submodule cases
+- [x] Explain the other cases git refuses: destination exists, locked worktree, another drive
+- [x] Create missing parent folders, since git doesn't
+- [x] Move your shell to the new path if you're inside the worktree
+- [x] Print one generic note after moving about things that saved the old full path
+- [x] Add tests, zsh completion and docs
 
 **Notes**:
 **Findings** (git 2.43, 2026-11-06): `git worktree move` renames the folder in one step, so staged, modified, untracked and ignored files, `.env` included, all arrive as they were, and `git status` reads the same afterwards. It needs no `--force` for a dirty worktree. A failed move changes nothing: moving to another filesystem fails with "Invalid cross-device link" and leaves the worktree in place and registered. git also refuses a locked worktree (unless `-f -f`), the main worktree, worktrees with submodules, an existing destination, and a destination whose parent folder doesn't exist.
@@ -102,6 +103,15 @@ restarting: virtualenvs, build caches, absolute symlinks, or programs still runn
 ```
 
 The usage guide explains it in more detail.
+
+**Result**: `gitwt move <branch> [<new-path>]` (alias `mv`). Without a path it moves the worktree to where `gitwt.path` puts the branch, so `git branch -m` followed by `gitwt move <new-name>` keeps the folder in step. A given path that's an existing folder or ends in `/` means "into it", like `mv`. Missing parent folders are created, and removed again if the move fails. If you're inside, you move with it to the same subfolder. Refused up front with nothing changed: the main repo, an existing destination (naming the branch or repo that has it, for the default path), a destination inside the worktree, a locked worktree (with the unlock command), and another drive. Submodules get git's refusal plus a tip. The generic note prints after every move. No `--force`: a lock is deliberate, so unlocking explicitly is clearer than overriding it. Added 20 tests; full suite 121/121 on bash 5.2, and renaming plus moving from inside were run by hand under zsh, along with completion.
+
+**Modified files**:
+- gitwt.sh
+- _gitwt
+- test/move.bats
+- docs/usage.md
+- README.md
 
 ### TASK-004 | Automate new worktree setup with .worktreeinclude and a post-create hook
 **Status**: done  

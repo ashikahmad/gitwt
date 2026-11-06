@@ -11,6 +11,7 @@ gitwt() {
     new)               _gitwt_new    "${@:2}" ;;
     remove)            _gitwt_remove "${@:2}" ;;
     switch|sw)         _gitwt_switch "${@:2}" ;;
+    move|mv)           _gitwt_move   "${@:2}" ;;
     list|ls)           _gitwt_list ;;
     version|--version|-v) echo "gitwt $GITWT_VERSION" ;;
     help|*)            _gitwt_help ;;
@@ -595,6 +596,142 @@ _gitwt_remove() {
   fi
 }
 
+# Prints the mount point a path is on (or would be on, for a path that doesn't exist yet).
+_gitwt_mount_of() {
+  local p="$1"
+  while [[ ! -e "$p" ]]; do p="$(dirname "$p")"; done
+  df -P "$p" 2>/dev/null | awk 'NR == 2 { for (i = 6; i <= NF; i++) printf "%s%s", $i, (i < NF ? " " : "\n") }'
+}
+
+# Whether the worktree registered at <path> is locked.
+_gitwt_is_locked() {
+  git worktree list --porcelain | awk -v target="$1" '
+    /^worktree / { path = substr($0, 10) }
+    /^locked/    { if (path == target) found = 1 }
+    END          { exit !found }
+  '
+}
+
+_gitwt_move() {
+  local branch="" dest=""
+
+  while [[ $# -gt 0 ]]; do
+    if [[ -z "$branch" ]]; then branch="$1"
+    elif [[ -z "$dest" ]]; then dest="$1"
+    else
+      echo "Error: too many arguments. Usage: gitwt move <branch-name> [<new-path>]" >&2
+      return 1
+    fi
+    shift
+  done
+
+  if [[ -z "$branch" ]]; then
+    echo "Usage: gitwt move <branch-name> [<new-path>]" >&2
+    echo "Without <new-path>, moves it to where gitwt.path puts that branch, e.g. after 'git branch -m'." >&2
+    return 1
+  fi
+
+  local worktree_path
+  worktree_path="$(_gitwt_find_path "$branch")" || return 1
+
+  local main_root wt_physical main_physical
+  main_root="$(_gitwt_main_repo_root)"
+  wt_physical="$(cd "$worktree_path" && pwd -P)"
+  main_physical="$(cd "$main_root" && pwd -P)"
+
+  if [[ "$wt_physical" == "$main_physical" ]]; then
+    echo "Error: '$branch' is checked out in the main repo, which can't be moved with gitwt." >&2
+    return 1
+  fi
+
+  # The destination: the given path (into it, if it's an existing folder or ends in /),
+  # or where gitwt.path puts this branch
+  local auto=0
+  if [[ -z "$dest" ]]; then
+    auto=1
+    dest="$(_gitwt_generate_path "$branch")" || return 1
+  else
+    [[ "$dest" == /* ]] || dest="$PWD/$dest"
+    # An existing folder, or a path ending in /, means "into this folder"
+    if [[ "$dest" == */ || ( -d "$dest" && ! -L "$dest" ) ]]; then
+      dest="${dest%/}/$(basename "$worktree_path")"
+    fi
+    dest="$(_gitwt_normalize_path "$dest")"
+  fi
+
+  local dest_physical=""
+  [[ -d "$dest" ]] && dest_physical="$(cd "$dest" && pwd -P)"
+  if [[ "$dest" == "$worktree_path" || "$dest_physical" == "$wt_physical" ]]; then
+    echo "'$branch' is already at: $worktree_path"
+    return 0
+  fi
+
+  if [[ -e "$dest" || -L "$dest" ]]; then
+    if (( auto )); then
+      _gitwt_explain_existing_path "$branch" "$dest"
+    else
+      echo "Error: destination already exists: $dest" >&2
+    fi
+    return 1
+  fi
+
+  if [[ "$dest" == "$worktree_path/"* || "$dest" == "$wt_physical/"* ]]; then
+    echo "Error: can't move a worktree into itself: $dest" >&2
+    return 1
+  fi
+
+  if _gitwt_is_locked "$worktree_path"; then
+    echo "Error: '$branch' is locked, so git won't move it." >&2
+    echo "Tip: if the lock is no longer needed, run 'git worktree unlock $worktree_path', then move it again." >&2
+    return 1
+  fi
+
+  if [[ "$(_gitwt_mount_of "$worktree_path")" != "$(_gitwt_mount_of "$dest")" ]]; then
+    echo "Error: $dest is on a different drive, and git can only move a worktree within one drive." >&2
+    echo "Tip: push or commit your work, remove this worktree, then create it again there with 'gitwt new $branch'." >&2
+    return 1
+  fi
+
+  # git doesn't create missing parent folders. Remember the first one made, to tidy up on failure.
+  local parent first_new=""
+  parent="$(dirname "$dest")"
+  if [[ ! -d "$parent" ]]; then
+    first_new="$parent"
+    while [[ ! -d "$(dirname "$first_new")" ]]; do first_new="$(dirname "$first_new")"; done
+    mkdir -p "$parent" || return 1
+  fi
+
+  local here inside=0 suffix=""
+  here="$(pwd -P)"
+  if [[ "$here" == "$wt_physical" || "$here" == "$wt_physical/"* ]]; then
+    inside=1
+    suffix="${here#"$wt_physical"}"
+  fi
+
+  echo "Moving '$branch' to: $dest"
+  if ! git -C "$main_root" worktree move "$worktree_path" "$dest"; then
+    if [[ -n "$first_new" ]]; then
+      local d="$parent"
+      while rmdir "$d" 2>/dev/null; do
+        [[ "$d" == "$first_new" ]] && break
+        d="$(dirname "$d")"
+      done
+    fi
+    if [[ -f "$worktree_path/.gitmodules" ]]; then
+      echo "Tip: git can't move a worktree that contains submodules. Push or commit your work, remove it, then create it again with 'gitwt new $branch'." >&2
+    fi
+    return 1
+  fi
+
+  if (( inside )); then
+    cd "$dest$suffix" 2>/dev/null || cd "$dest" || return 1
+    echo "You were inside it, so you're now at: $PWD"
+  fi
+  _gitwt_note_if_untracked_in_repo "$dest"
+  echo "Done. Files are unchanged. Anything that saved the old full path may need recreating or"
+  echo "restarting: virtualenvs, build caches, absolute symlinks, or programs still running there."
+}
+
 _gitwt_list() {
   local main_root
   main_root="$(_gitwt_main_repo_root 2>/dev/null)"
@@ -713,6 +850,11 @@ COMMANDS
                               Flags:
                                 --branch        also delete the local branch
                                 --force         remove anyway, discarding all of that
+
+  move <branch-name> [<path>] Move a worktree to another folder; everything in it moves
+                              as is. Without <path>, moves it to where gitwt.path puts
+                              the branch (e.g. after 'git branch -m'). If you're inside,
+                              you move with it. Alias: mv
 
   list                        Show all worktrees with branch, sync state
                               (ahead/behind upstream), changes, and path.

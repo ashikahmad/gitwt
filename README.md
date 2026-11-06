@@ -28,6 +28,7 @@ With raw git you'd need to `git checkout develop && git pull && git checkout -b 
 - **`new`** — create a worktree and `cd` into it in one command; works out whether to create the branch or attach an existing one
 - **`switch` / `sw`** — jump into any worktree by branch name
 - **`remove`** — tear down a worktree, and optionally its branch; refuses if you'd lose uncommitted work or an edited `.env`, and returns you to the main repo if you're inside it
+- **`move` / `mv`** — move a worktree to another folder, or keep its folder name in step with a renamed branch; everything in it moves as is
 - **`list` / `ls`** — a table of every worktree with its branch, sync with upstream, local changes and path
 - **Custom worktree paths** — choose where new worktrees go with a `gitwt.path` template, per repo or for all repos
 - **New worktree setup** — copy ignored files such as `.env` and run a setup script automatically
@@ -56,6 +57,7 @@ gitwt new feature/dark-mode                         # new branch off the current
 gitwt new feature/dark-mode --from main --fetch     # fetch main first, then branch off it
 gitwt new fix/existing-branch                       # existing branch: just add a worktree
 gitwt sw main                                       # jump to another worktree
+gitwt move feature/new                              # after git branch -m: rename the folder too
 gitwt remove feature/dark-mode --branch             # remove the worktree and its branch
 ```
 

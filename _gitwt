@@ -19,6 +19,8 @@ _gitwt() {
         'switch:cd into an existing worktree'
         'sw:cd into an existing worktree (alias for switch)'
         'remove:Remove a worktree'
+        'move:Move a worktree to another folder'
+        'mv:Move a worktree to another folder (alias for move)'
         'list:Show all worktrees with sync and changes state'
         'ls:Show all worktrees with sync and changes state (alias for list)'
         'version:Show gitwt version'
@@ -32,6 +34,10 @@ _gitwt() {
         new)       _gitwt_complete_new ;;
         switch|sw) _gitwt_complete_worktree_branches ;;
         remove)    _gitwt_complete_remove ;;
+        move|mv)
+          if (( CURRENT == 3 )); then _gitwt_complete_worktree_branches
+          else _files -/
+          fi ;;
       esac
       ;;
   esac
