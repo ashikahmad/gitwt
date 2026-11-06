@@ -321,11 +321,12 @@ Without `--recurse-submodules`, `test/libs/*` is empty and run_tests.sh fails wi
 - test/path_config.bats
 
 ### TASK-019 | Fix gitwt list alignment and bare repo display
-**Status**: in-review  
+**Status**: done  
 **Priority**: Low  
 **Category**: CLI  
 **Created**: 2026-11-05  
 **Started**: 2026-11-06  
+**Finished**: 2026-11-06  
 **Tags**: #bug  
 
 Under bash 3.2, printf pads by bytes, so `✓`, `·` and `─` misalign rows (PATH starts at column 93-99; always 99 under zsh in a UTF-8 locale, while `LC_ALL=C` zsh misaligns too). Both shells shift when CHANGES exceeds 30 characters. A bare repo's entry shows as `(detached:)` with `✓ clean`. Newer bash versions were not tested.
@@ -438,11 +439,12 @@ Each feature PR documents itself in the README, so after TASK-004 and TASK-023 t
 - gitwt.sh (help text only)
 
 ### TASK-033 | Make gitwt ls fast by default, with the expensive columns behind a flag
-**Status**: in-review  
+**Status**: done  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-06  
 **Started**: 2026-11-06  
+**Finished**: 2026-11-06  
 **Tags**: #feature  
 
 `gitwt ls` was rich but slow with many worktrees or large ones. For each worktree it ran `git rev-list --count` twice (SYNC) and `git status --porcelain` (CHANGES), which reads every file in the worktree. Its fixed-width columns also misaligned (TASK-019).
