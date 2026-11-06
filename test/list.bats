@@ -341,3 +341,73 @@ WRAP
   assert_success
   refute_output --partial "BRANCH"
 }
+
+# ── second review ──────────────────────────────────────────────────────────────
+
+# Gives <branch> an upstream on a local bare remote, and puts it <n> commits ahead.
+with_upstream_ahead() {
+  local branch="$1" n="$2" wt="$3"
+  [[ -d "$TEST_WORK_DIR/origin.git" ]] || { git init -q --bare "$TEST_WORK_DIR/origin.git"; git remote add origin "$TEST_WORK_DIR/origin.git"; }
+  git -C "$wt" push -q -u origin "refs/heads/$branch:refs/heads/$branch"
+  for i in $(seq 1 "$n"); do git -C "$wt" commit -q --allow-empty -m "c$i"; done
+}
+
+@test "list: SYNC works for a branch that has a tag of the same name" {
+  git worktree add -q -b v1.2 "$TEST_WORK_DIR/worktrees/myrepo/v1.2" HEAD
+  git tag v1.2
+  with_upstream_ahead v1.2 2 "$TEST_WORK_DIR/worktrees/myrepo/v1.2"
+
+  run "$GITWT_RUNNER" ls
+  assert_success
+  assert_line --regexp '^  v1\.2 +2 ahead +'
+}
+
+@test "list: ahead/behind is looked up only for the worktrees' branches" {
+  git worktree add -q -b feat "$TEST_WORK_DIR/worktrees/myrepo/feat" HEAD
+  for i in 1 2 3; do git branch "other$i"; done
+  log_git_calls
+
+  PATH="$TEST_WORK_DIR/bin:$PATH" run "$GITWT_RUNNER" ls
+  assert_success
+  run grep for-each-ref "$TEST_WORK_DIR/git-calls"
+  assert_output --partial "refs/heads/main"
+  assert_output --partial "refs/heads/feat"
+  refute_output --partial "other"
+}
+
+@test "list -l: works with pipefail on when the last worktree is stale" {
+  git worktree add -q -b feat "$TEST_WORK_DIR/worktrees/myrepo/feat" HEAD
+  git worktree add -q -b zz "$TEST_WORK_DIR/worktrees/myrepo/zz" HEAD
+  rm -rf "$TEST_WORK_DIR/worktrees/myrepo/zz"
+  local gitwt_sh; gitwt_sh="$(cd "$BATS_TEST_DIRNAME/.." && pwd)/gitwt.sh"
+
+  run bash -c "set -o pipefail; source '$gitwt_sh'; gitwt ls -l"
+  assert_success
+  assert_line --regexp '^  feat +- +✓ clean +'
+  assert_line --regexp '^  \(stale\) +'
+}
+
+@test "list: one commit git can't find doesn't blank LAST COMMIT for the others" {
+  git worktree add -q -b feat "$TEST_WORK_DIR/worktrees/myrepo/feat" HEAD
+  git worktree add -q --detach "$TEST_WORK_DIR/worktrees/myrepo/bad" HEAD
+  echo 1234567890123456789012345678901234567890 > "$(git rev-parse --git-common-dir)/worktrees/bad/HEAD"
+
+  run "$GITWT_RUNNER" ls
+  assert_success
+  assert_line --regexp '^\* main +- +[0-9a-z ]+ ago +myrepo$'
+  assert_line --regexp '^  feat +- +[0-9a-z ]+ ago +'
+}
+
+@test "list: a worktree on a branch with no commits yet doesn't blank the others, in a SHA-256 repo" {
+  git worktree add -h 2>&1 | grep -q -- --orphan || skip "git worktree add --orphan needs git 2.42+"
+  local repo="$TEST_WORK_DIR/sha256repo"
+  git init -q -b main --object-format=sha256 "$repo" 2>/dev/null || skip "this git can't create SHA-256 repos"
+  git -C "$repo" -c user.email=t@t -c user.name=t commit -q --allow-empty -m init
+  git -C "$repo" worktree add -q --orphan -b fresh "$TEST_WORK_DIR/fresh"
+
+  cd "$repo"
+  run "$GITWT_RUNNER" ls
+  assert_success
+  assert_line --regexp '^\* main +- +[0-9a-z ]+ ago +sha256repo$'
+  assert_line --regexp '^  fresh +- +- +fresh$'
+}

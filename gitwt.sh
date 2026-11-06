@@ -822,7 +822,8 @@ _gitwt_current_worktree() {
 }
 
 # Sets the caller's `padded` to <text> followed by spaces up to <width> characters. printf pads
-# by bytes in bash, which misaligns multi-byte characters such as ✓; this counts characters.
+# by bytes in bash, which misaligns multi-byte characters such as ✓; this counts characters,
+# which shells can only do in a UTF-8 locale. Under LC_ALL=C, rows with ✓ can be 2 short.
 # Sets a variable rather than printing, to avoid a subshell for every cell.
 _gitwt_pad() {
   local spaces="                                                                                "
@@ -935,23 +936,35 @@ _gitwt_list_table() {
     return 1
   fi
 
-  # Ahead/behind for every branch at once, against the last fetch. Lookups use associative
-  # arrays: matching patterns against one long string is slow in zsh.
+  # Ahead/behind for the worktrees' branches, all in one command, against the last fetch.
+  # Only those branches are asked for, so a repo with many other branches stays fast.
+  # lstrip=2 gives the plain name even when a tag or remote ref has the same name, where
+  # refname:short would say heads/<name>. Lookups use associative arrays: matching patterns
+  # against one long string is slow in zsh.
   local line name upstream track
   local -A tracks ages counts
-  while IFS= read -r line; do
-    tracks[${line%%"$us"*}]="${line#*"$us"}"
-  done < <(git for-each-ref --format="%(refname:short)$us%(upstream)$us%(upstream:track)" refs/heads 2>/dev/null)
+  local -a branch_refs
+  branch_refs=()
+  for entry in "${rows[@]}"; do
+    _gitwt_row_fields "$entry"
+    [[ "$f_kind" == branch ]] && branch_refs+=("refs/heads/$f_label")
+  done
+  if (( ${#branch_refs[@]} > 0 )); then
+    while IFS= read -r line; do
+      tracks[${line%%"$us"*}]="${line#*"$us"}"
+    done < <(git for-each-ref --format="%(refname:lstrip=2)$us%(upstream)$us%(upstream:track)" "${branch_refs[@]}" 2>/dev/null)
+  fi
 
   # The last commit of every worktree at once
   for entry in "${rows[@]}"; do
     _gitwt_row_fields "$entry"
-    [[ -n "$f_head" && "$f_head" != 0000000000000000000000000000000000000000 ]] && heads+=("$f_head")
+    # An all-zero ID (40 or 64 digits) means a branch with no commits yet
+    [[ "$f_head" == *[!0]* ]] && heads+=("$f_head")
   done
   if (( ${#heads[@]} > 0 )); then
     while IFS= read -r line; do
       ages[${line%%"$us"*}]="${line#*"$us"}"
-    done < <(git log --no-walk --format="%H$us%cr" "${heads[@]}" 2>/dev/null)
+    done < <(git log --no-walk --ignore-missing --format="%H$us%cr" "${heads[@]}" 2>/dev/null)
   fi
 
   # CHANGES, for -l only
@@ -967,13 +980,17 @@ _gitwt_list_table() {
     # so the git status runs would carry on in the background after you interrupt.
     local raw
     n=0
+    # The loop uses `if`, not `&&`, so its last command never fails: with pipefail on, a
+    # failing loop would fail the whole pipeline.
     raw="$(
       for entry in "${rows[@]}"; do
         n=$((n + 1))
         _gitwt_row_fields "$entry"
-        [[ "$f_kind" == branch || "$f_kind" == detached ]] && printf '%s\0%s\0' "$f_path" "$n"
+        if [[ "$f_kind" == branch || "$f_kind" == detached ]]; then
+          printf '%s\0%s\0' "$f_path" "$n"
+        fi
       done | _gitwt_status_counts
-    )" || return 130
+    )"
     while IFS= read -r line; do
       [[ -n "$line" ]] && counts[${line%% *}]="${line#* }"
     done <<< "$raw"

@@ -223,7 +223,7 @@ $ gitwt ls -l
 | LAST COMMIT | How long ago the worktree's current commit was made |
 | PATH | Relative to the folder that contains the main repo, or the full path when it's elsewhere. `(locked)` after it marks a worktree locked with `git worktree lock` |
 
-Columns are as wide as their contents. If any worktree is stale, `list` ends with a tip to run `git worktree prune`.
+Columns are as wide as their contents, counted in characters in a UTF-8 locale (under `LC_ALL=C`, rows with `✓` can be 2 short). If any worktree is stale, `list` ends with a tip to run `git worktree prune`.
 
 **Why CHANGES needs `-l`:** everything else comes from git's own records in three git commands, whatever the number of worktrees. Counting changes means running `git status` in each worktree, which reads every file, so it takes longer with many or large worktrees. `-l` runs up to 8 at a time.
 
@@ -475,7 +475,7 @@ Files gitwt reads:
 - for `new`: local branches that don't have a worktree yet, plus `--from` and `--fetch`; after `--from`, all local branches,
 - for `switch` and `remove`: branches that have a worktree, plus `--branch` for `remove`,
 - for `move`: branches that have a worktree, except the main repo's, then folders for the second argument,
-- for `list`: `-s` and `--short`.
+- for `list`: `-l`, `--long`, `-s` and `--short`.
 
 Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command not found: compdef` at startup (TASK-014). bash has no completion yet.
 
@@ -520,6 +520,8 @@ Source it after `compinit` in `~/.zshrc`. Before `compinit`, zsh prints `command
 ## Known limitations
 
 **bash 3.2 isn't tested or officially supported.** That's the version macOS ships as `/bin/bash`. zsh 5.9 and bash 5.2 are tested.
+
+**A worktree whose path contains a newline** shows as `(stale)` in `gitwt ls`. Reading such paths needs `git worktree list -z`, which is git 2.36+; gitwt supports 2.18.
 
 These are tracked on the [project board](https://ashikahmad.github.io/Kanban.md/app/?board=https://github.com/ashikahmad/gitwt/blob/dev/board/kanban.md):
 
