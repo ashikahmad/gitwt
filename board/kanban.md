@@ -508,9 +508,10 @@ gitwt has no website. The README and usage guide are only readable on GitHub.
 - [x] The usage guide at `/gitwt/docs/` with Just the Docs, copied in from `docs/usage.md` at build time so it has one source
 - [x] Catppuccin Latte in light mode and Frappé in dark, following the system, with a green accent
 - [x] A GitHub Actions workflow that builds and deploys from `main`
-- [ ] Set Settings → Pages → Source to "GitHub Actions" (repo owner)
+- [x] Set Settings → Pages → Source to "GitHub Actions" (repo owner)
 - [ ] Release `dev` to `main`, then check the live site
-- [ ] Link the site from the README and `gitwt help` once it's live
+- [x] Link the site from the README and `gitwt help` once it's live
+- [x] Docs sidebar lists the guide's own sections: one page per section, commands as child pages, old one-page links forwarded, links checked at every deploy
 
 **Notes**:
 **Design**: the site is built from `main`, so it documents what people get when they install. `site/prepare.sh` copies `docs/usage.md` and `icon.svg` into the site and fixes the guide's link to the README. The landing page is separate copy, so update it with the README when a feature is added. Colours come from the Catppuccin palette, except the light-mode green: Latte's `#40a02b` is only 2.96:1 on its background, so links and buttons use `#307820`, darkened from it to 4.8:1. Frappé's green `#a6d189` is used as is.
@@ -566,7 +567,7 @@ Switching needs the branch name typed out. `gitwt sw` with no branch only prints
 - [x] Fix the installer bugs in TASK-008, TASK-014 and TASK-022
 - [x] Show the one-liner on the website's landing page, Homebrew-style, and in the README, guide and `gitwt help`
 - [x] Add tests, without network access
-- [ ] At release: tag `v0.2.0`, then check the one-liner works
+- [x] At release: tag `v0.2.0`, then check the one-liner works
 - [ ] At release: open the link in gitwt's and the installer's bash 3.2 messages (the site's guide, `#whats-supported`), and the guide's links to Homebrew's bash and Apple's zsh page (not reachable from the cloud session)
 
 **Notes**:

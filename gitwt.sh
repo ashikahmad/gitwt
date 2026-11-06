@@ -1127,7 +1127,7 @@ _gitwt_list() {
 _gitwt_help() {
   cat <<'EOF'
 gitwt — a friendly wrapper around git worktree
-Full guide: https://github.com/ashikahmad/gitwt/blob/main/docs/usage.md
+Full guide: https://ashikahmad.github.io/gitwt/docs/
 
 USAGE
   gitwt <command> [args]
