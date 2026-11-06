@@ -29,7 +29,7 @@ With raw git you'd need to `git checkout develop && git pull && git checkout -b 
 - **`switch` / `sw`** — jump into any worktree by branch name
 - **`remove`** — tear down a worktree; auto-returns you to the main repo if you're inside it
 - **`list` / `ls`** — clean table of all worktrees with branch and relative path
-- **New worktree setup** — copy ignored files such as `.env` and run a setup script automatically
+- **New worktree setup** — copy ignored files such as `.env` and run a setup script (your own, via `gitwt.postCreate`) automatically
 - **Zsh tab-completion** via the included `_gitwt` completion script
 
 ---
@@ -204,9 +204,31 @@ Commit an executable script at `.gitwt/post-create`, for example to install depe
 npm install
 ```
 
-It runs inside the new worktree, after files are copied, with `GITWT_BRANCH`, `GITWT_WORKTREE` and `GITWT_MAIN_ROOT` set.
+It runs inside the new worktree, after files are copied, with `GITWT_BRANCH`, `GITWT_WORKTREE` and `GITWT_MAIN_ROOT` set. The script is read from the new worktree, so the branch you create or attach needs to contain it.
 
-Because the script comes from the repo, gitwt asks before running it. Your approval covers that exact version of `.gitwt/post-create` and is stored in the repo's local git config, so a changed script asks again. It covers only that file: if the script runs other files from the repo, such as `./scripts/setup.sh`, changes to those don't ask again, so review what it calls too. Without a terminal, an unapproved script is skipped with a note. If the script fails, you get a warning and the worktree is kept, you're still moved into it, and `gitwt new` returns 1.
+### Use your own script: `gitwt.postCreate`
+
+To have gitwt run a script you already use by hand, such as `scripts/setup.sh`, point to it in git config instead:
+
+```sh
+git config gitwt.postCreate scripts/setup.sh            # this repo
+git config --global gitwt.postCreate scripts/setup.sh   # every repo
+```
+
+The path is relative to the repo root and must stay inside it. When `gitwt.postCreate` is set, only that script runs and `.gitwt/post-create` is ignored. To turn setup off for a repo, even if it has `.gitwt/post-create`, set it to an empty value: `git config gitwt.postCreate ""`.
+
+If the configured file is missing, not executable or outside the repo, you get a warning, no script runs and `gitwt new` returns 1. gitwt does not fall back to `.gitwt/post-create`.
+
+The `GITWT_*` variables are only set when gitwt runs the script, so a script you also run by hand should work without them.
+
+### Approving the script
+
+Because the script comes from the repo, gitwt asks before running it. Your approval covers that exact version of the script and is stored in the repo's local git config, so a changed script asks again. Only one version is approved at a time, so branches with different versions of the script each ask again. Approval covers only the script file itself: if it runs other files from the repo, changes to those don't ask again, so review what it calls too. Without a terminal, an unapproved script is skipped with a note. If the script fails, you get a warning and the worktree is kept, you're still moved into it, and `gitwt new` returns 1.
+
+```sh
+git config gitwt.postCreateApproved "$(git hash-object --no-filters .gitwt/post-create)"  # approve without the prompt
+git config --unset gitwt.postCreateApproved                                              # revoke approval
+```
 
 ---
 

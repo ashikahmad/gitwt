@@ -111,24 +111,51 @@ _gitwt_copy_included() {
   return 0
 }
 
-# Runs <worktree>/.gitwt/post-create. The script comes from the repo, so it only runs once this
+# Runs the setup script inside <worktree>. The script is the file named by `gitwt.postCreate`
+# (a path relative to the worktree root) or, when that isn't set, .gitwt/post-create. Setting it
+# to an empty value turns setup off. The script comes from the repo, so it only runs once this
 # exact version is approved; the approval is stored as its hash in the repo's local git config.
-# Returns non-zero only if the script ran and failed.
+# Returns non-zero if the script failed, or if the configured script can't be used.
 _gitwt_run_post_create() {
   local worktree="$1" branch="$2" main_root="$3"
-  local script="$worktree/.gitwt/post-create"
-  [[ -f "$script" ]] || return 0
+  local rel configured=0
 
-  if [[ ! -x "$script" ]]; then
-    echo "Note: .gitwt/post-create is not executable, skipping it." >&2
-    return 0
+  if rel="$(git -C "$worktree" config --get gitwt.postCreate)"; then
+    configured=1
+    [[ -n "$rel" ]] || return 0
+  else
+    rel=".gitwt/post-create"
+  fi
+
+  local script="$worktree/$rel"
+
+  if (( configured )); then
+    case "/$rel/" in
+      //*|*/../*)
+        echo "Warning: gitwt.postCreate must be a path inside the repo, not '$rel'. No setup script was run." >&2
+        return 1 ;;
+    esac
+    if [[ ! -f "$script" ]]; then
+      echo "Warning: gitwt.postCreate is set to '$rel', but that file doesn't exist in the new worktree. No setup script was run." >&2
+      return 1
+    fi
+    if [[ ! -x "$script" ]]; then
+      echo "Warning: gitwt.postCreate is set to '$rel', but that file isn't executable. No setup script was run." >&2
+      return 1
+    fi
+  else
+    [[ -f "$script" ]] || return 0
+    if [[ ! -x "$script" ]]; then
+      echo "Note: $rel is not executable, skipping it." >&2
+      return 0
+    fi
   fi
 
   local script_hash answer
   script_hash="$(git -C "$worktree" hash-object --no-filters "$script")"
   if [[ "$(git -C "$worktree" config --get gitwt.postCreateApproved)" != "$script_hash" ]]; then
     if [[ ! -t 0 ]]; then
-      echo "Note: .gitwt/post-create is not approved, skipping it. Run 'gitwt new' from a terminal to approve it." >&2
+      echo "Note: $rel is not approved, skipping it. Run 'gitwt new' from a terminal to approve it." >&2
       return 0
     fi
     printf "This repo has a setup script that hasn't been approved: %s\n" "$script"
@@ -136,13 +163,13 @@ _gitwt_run_post_create() {
     read -r answer
     case "$answer" in
       y|Y|yes) git -C "$worktree" config --local gitwt.postCreateApproved "$script_hash" ;;
-      *)       echo "Skipped .gitwt/post-create."; return 0 ;;
+      *)       echo "Skipped $rel."; return 0 ;;
     esac
   fi
 
-  echo "Running .gitwt/post-create..."
+  echo "Running $rel..."
   if ! ( cd "$worktree" && GITWT_BRANCH="$branch" GITWT_WORKTREE="$worktree" GITWT_MAIN_ROOT="$main_root" "$script" ); then
-    echo "Warning: .gitwt/post-create failed. The worktree was still created." >&2
+    echo "Warning: $rel failed. The worktree was still created." >&2
     return 1
   fi
 }
@@ -459,6 +486,9 @@ NEW WORKTREE SETUP
   .gitwt/post-create          Executable script run inside each new worktree, once
                               you've approved that version of it. Gets GITWT_BRANCH,
                               GITWT_WORKTREE and GITWT_MAIN_ROOT.
+  git config gitwt.postCreate <path>
+                              Run <path> (relative to the repo root) instead of
+                              .gitwt/post-create. Set it to "" to turn setup off.
 
 WORKTREE PATH LAYOUT
   New worktrees are placed at:

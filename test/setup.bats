@@ -182,3 +182,115 @@ approve_hook() {
   assert_success
   refute_output --partial "post-create"
 }
+
+# ── gitwt.postCreate ───────────────────────────────────────────────────────────
+
+# Commits an executable script at the given path with the given body.
+add_script() {
+  mkdir -p "$(dirname "$1")"
+  printf '#!/bin/sh\n%s\n' "$2" > "$1"
+  chmod +x "$1"
+  git add "$1"
+  git commit -qm "script $1"
+}
+
+approve_script() {
+  git config gitwt.postCreateApproved "$(git hash-object --no-filters "$1")"
+}
+
+@test "config: runs the configured script with the gitwt variables" {
+  add_script scripts/setup.sh 'echo "$GITWT_BRANCH|$GITWT_WORKTREE|$(pwd -P)" > setup-ran'
+  approve_script scripts/setup.sh
+  git config gitwt.postCreate scripts/setup.sh
+  run "$GITWT_RUNNER" new feat </dev/null
+  assert_success
+  assert_output --partial "Running scripts/setup.sh..."
+  assert_equal "$(cat "$WT/setup-ran")" "feat|$WT|$WT"
+}
+
+@test "config: only the configured script runs when .gitwt/post-create also exists" {
+  add_hook 'touch hook-ran'
+  approve_hook
+  add_script scripts/setup.sh 'touch setup-ran'
+  git config gitwt.postCreate scripts/setup.sh
+  approve_script scripts/setup.sh
+  run "$GITWT_RUNNER" new feat </dev/null
+  assert_success
+  assert [ -e "$WT/setup-ran" ]
+  assert [ ! -e "$WT/hook-ran" ]
+  refute_output --partial "post-create"
+}
+
+@test "config: an empty value turns setup off" {
+  add_hook 'touch hook-ran'
+  approve_hook
+  git config gitwt.postCreate ""
+  run "$GITWT_RUNNER" new feat </dev/null
+  assert_success
+  assert [ ! -e "$WT/hook-ran" ]
+  refute_output --partial "post-create"
+}
+
+@test "config: a missing script warns, runs nothing, keeps the worktree and returns 1" {
+  add_hook 'touch hook-ran'
+  approve_hook
+  git config gitwt.postCreate scripts/missing.sh
+  run "$GITWT_RUNNER" new feat </dev/null
+  assert_failure 1
+  assert_output --partial "'scripts/missing.sh', but that file doesn't exist"
+  assert_output --partial "__PWD__:$WT"
+  assert [ ! -e "$WT/hook-ran" ]
+}
+
+@test "config: a script that is not executable warns and returns 1" {
+  add_script scripts/setup.sh 'touch setup-ran'
+  approve_script scripts/setup.sh
+  chmod -x scripts/setup.sh
+  git add scripts; git commit -qm "drop mode bit"
+  git config gitwt.postCreate scripts/setup.sh
+  run "$GITWT_RUNNER" new feat </dev/null
+  assert_failure 1
+  assert_output --partial "isn't executable"
+  assert [ ! -e "$WT/setup-ran" ]
+}
+
+@test "config: paths outside the repo are refused" {
+  printf '#!/bin/sh\ntouch "%s/outside-ran"\n' "$TEST_WORK_DIR" > "$TEST_WORK_DIR/outside.sh"
+  chmod +x "$TEST_WORK_DIR/outside.sh"
+  for p in ../../../outside.sh "$TEST_WORK_DIR/outside.sh" "scripts/../../../../outside.sh"; do
+    git config gitwt.postCreate "$p"
+    git worktree remove --force "$WT" 2>/dev/null || true
+    git branch -D feat 2>/dev/null || true
+    run "$GITWT_RUNNER" new feat </dev/null
+    assert_failure 1
+    assert_output --partial "must be a path inside the repo"
+  done
+  assert [ ! -e "$TEST_WORK_DIR/outside-ran" ]
+}
+
+@test "config: an unapproved configured script is skipped without a terminal" {
+  add_script scripts/setup.sh 'touch setup-ran'
+  git config gitwt.postCreate scripts/setup.sh
+  run "$GITWT_RUNNER" new feat </dev/null
+  assert_success
+  assert_output --partial "scripts/setup.sh is not approved"
+  assert [ ! -e "$WT/setup-ran" ]
+}
+
+@test "config: a global setting applies, and the repo setting wins over it" {
+  export GIT_CONFIG_GLOBAL="$TEST_WORK_DIR/global.gitconfig"
+  add_script scripts/global.sh 'touch global-ran'
+  add_script scripts/local.sh 'touch local-ran'
+  git config --global gitwt.postCreate scripts/global.sh
+  approve_script scripts/global.sh
+  run "$GITWT_RUNNER" new feat </dev/null
+  assert_success
+  assert [ -e "$WT/global-ran" ]
+
+  git config gitwt.postCreate scripts/local.sh
+  approve_script scripts/local.sh
+  run "$GITWT_RUNNER" new other </dev/null
+  assert_success
+  assert [ -e "$TEST_WORK_DIR/worktrees/myrepo/other/local-ran" ]
+  assert [ ! -e "$TEST_WORK_DIR/worktrees/myrepo/other/global-ran" ]
+}
