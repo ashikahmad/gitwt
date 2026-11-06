@@ -365,14 +365,20 @@ wire_bash() {
 # gitwt needs zsh or bash 4 or newer. Only the login shell matters: on a Mac this script
 # itself always runs in /bin/bash 3.2, whatever shell the user has.
 check_bash_version() {
-  local v
+  local darwin="$1" v
   v="$("$SHELL" -c 'echo "${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"' 2>/dev/null </dev/null || true)"
   if [[ "$v" =~ ^[0-9]+\.[0-9]+$ ]] && (( ${v%%.*} < 4 )); then
     yellow "Warning: your shell is bash $v, which gitwt doesn't support: it needs zsh, or bash 4"
     yellow "or newer. In bash $v, gitwt stops with this message instead of running. Either:"
-    yellow "  - switch to zsh, macOS's default shell since 10.15:  chsh -s /bin/zsh"
-    yellow "    (then run this installer again, so ~/.zshrc loads gitwt), or"
-    yellow "  - install a newer bash, e.g. brew install bash, and make it your shell."
+    if (( darwin )); then
+      yellow "  - switch to zsh, macOS's default shell since 10.15:  chsh -s /bin/zsh"
+      yellow "    (then run this installer again, so ~/.zshrc loads gitwt), or"
+      yellow "  - install a newer bash, e.g. brew install bash, and make it your shell."
+    else
+      yellow "  - install zsh with your system's package manager and make it your shell"
+      yellow "    (chsh -s \"\$(command -v zsh)\"), then run this installer again, or"
+      yellow "  - install a newer bash the same way, and make it your shell."
+    fi
     echo ""
   fi
 }
@@ -404,7 +410,7 @@ wire_shells() {
     if (( darwin )) && [[ "$shell" == bash ]]; then wire_bash "$bashrc" 1; else wire_bash "$bashrc" 0; fi
   fi
   echo ""
-  if [[ "$shell" == bash ]]; then check_bash_version; fi
+  if [[ "$shell" == bash ]]; then check_bash_version "$darwin"; fi
 }
 
 # ── done ───────────────────────────────────────────────────────────────────────

@@ -25,7 +25,7 @@ load 'test_helper'
 # its bash major version as 3.
 _as_bash3() {
   sed 's/BASH_VERSINFO\[0\]/3/' "$BATS_TEST_DIRNAME/../gitwt.sh" > "$BATS_TEST_TMPDIR/gitwt3.sh"
-  run bash -c "source '$BATS_TEST_TMPDIR/gitwt3.sh'; gitwt $1"
+  run bash -c "OSTYPE='${2:-linux-gnu}'; source '$BATS_TEST_TMPDIR/gitwt3.sh'; gitwt $1"
 }
 
 @test "bash older than 4: every command stops with the not-supported message" {
@@ -53,4 +53,16 @@ _as_bash3() {
     assert_success
     refute_output --partial "isn't supported"
   fi
+}
+
+@test "bash older than 4: the advice fits the system" {
+  _as_bash3 ls linux-gnu
+  assert_output --partial "your system's package manager"
+  refute_output --partial "macOS"
+  refute_output --partial "brew"
+
+  _as_bash3 ls darwin25
+  assert_output --partial "chsh -s /bin/zsh"
+  assert_output --partial "brew install bash"
+  refute_output --partial "package manager"
 }

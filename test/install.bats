@@ -485,7 +485,17 @@ _on_macos() { printf '#!/bin/sh\necho Darwin\n' > "$T/bin/uname"; chmod +x "$T/b
   SHELL="$T/oldbash/bash" install_piped
   assert_success
   assert_output --partial "Warning: your shell is bash 3.2, which gitwt doesn't support"
+  # Not a Mac here: no macOS or Homebrew advice
+  assert_output --partial "your system's package manager"
+  refute_output --partial "macOS"
+  refute_output --partial "brew"
+
+  _on_macos
+  SHELL="$T/oldbash/bash" install_piped
+  assert_success
   assert_output --partial "chsh -s /bin/zsh"
+  assert_output --partial "brew install bash"
+  refute_output --partial "package manager"
 }
 
 @test "install: no bash version warning for a zsh user, or a bash 4+ user" {
