@@ -23,11 +23,11 @@ gitwt is a shell function, so it has to be sourced into your shell rather than r
 
 | | Supported | Tested with | Not supported |
 |---|---|---|---|
-| **Systems** | macOS, Linux | Linux | Windows, except through WSL (untested) |
+| **Systems** | macOS, Linux | Linux; macOS 26 | Windows, except through WSL (untested) |
 | **Shells** | zsh; bash 4 or newer | zsh 5.9, bash 5.2 | bash 3.2, macOS's `/bin/bash`; fish and other shells |
 | **git** | 2.18 or newer | 2.43 | older |
 | **Tab-completion** | zsh | zsh 5.9 | bash (not yet: [👍 the issue](https://github.com/ashikahmad/gitwt/issues/11) if you'd use it) |
-| **Installer** | any bash, including macOS's 3.2, with `curl` or `wget` | bash 5.2 | sh, without bash |
+| **Installer** | any bash, including macOS's 3.2, with `curl` or `wget` | bash 5.2; macOS's bash 3.2 | sh, without bash |
 
 On macOS, zsh has been the default shell since macOS 10.15 (Catalina), so most Macs are ready. If your shell is still bash, check with `echo $BASH_VERSION`: macOS's own is 3.2, where every `gitwt` command stops with a message saying it isn't supported. The installer warns about this too; switch to zsh with `chsh -s /bin/zsh` and run it again, or install a newer bash (`brew install bash`).
 
