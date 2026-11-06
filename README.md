@@ -263,6 +263,12 @@ Then use `gwt` everywhere instead — `gwt new feature/dark-mode`, `gwt sw main`
 
 ---
 
+## Project board
+
+Planned work, bugs and ideas are tracked in [`board/kanban.md`](board/kanban.md), a [Kanban.md](https://github.com/ashikahmad/Kanban.md) board. You can also [view it as a board](https://ashikahmad.github.io/Kanban.md/app/?board=https://github.com/ashikahmad/gitwt/blob/dev/board/kanban.md), read-only, in any browser. It shows the `dev` branch, where work lands first.
+
+---
+
 ## License
 
 MIT

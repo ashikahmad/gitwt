@@ -80,11 +80,12 @@ gitwt has no move or rename command. `git branch -m` works and `gitwt sw` still 
 - [ ] Add tests, zsh completion and docs
 
 ### TASK-004 | Automate new worktree setup with .worktreeinclude and a post-create hook
-**Status**: in-review  
+**Status**: done  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
 **Started**: 2026-11-05  
+**Finished**: 2026-11-06  
 **Tags**: #feature  
 
 gitwt has no setup step, so ignored files and project setup must be redone by hand in every new worktree. Git's `post-checkout` hook does fire on `gitwt new`, but it also fires on ordinary checkouts, and hooks in `.git/hooks` are not versioned or shared. Similar tools combine a list of ignored files to copy with post-create commands; `.worktreeinclude` is used by Claude Code, wt-cli and PostHog Code.
@@ -109,11 +110,12 @@ gitwt has no setup step, so ignored files and project setup must be redone by ha
 **Shared with TASK-001**: the code that reads `.worktreeinclude` is one helper, `_gitwt_included_files <dir>`, because TASK-001 uses the same list to decide which ignored files to protect on removal. Files copied in by this task are the ones it compares with the main repo's copy, so keep the copy step predictable.
 
 ### TASK-005 | Fix infinite loop when --from has no value
-**Status**: in-review  
+**Status**: done  
 **Priority**: High  
 **Category**: CLI  
 **Created**: 2026-11-05  
 **Started**: 2026-11-05  
+**Finished**: 2026-11-06  
 **Tags**: #bug  
 
 `gitwt new foo --from` and `gitwt new --from` never finish, because `shift 2` fails without shifting (gitwt.sh:88). bash hangs silently; zsh prints `shift count must be <= $#` repeatedly (36 MB in 5 seconds). `--from=` does not hang.
