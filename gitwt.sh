@@ -356,27 +356,72 @@ _gitwt_pick_remote() {
   return 1
 }
 
-# The remote to look on for a branch when nothing says which: as _gitwt_pick_remote over
-# all remotes, falling back to origin
-_gitwt_fetch_remote() {
-  local remotes
-  remotes="$(git remote 2>/dev/null)"
-  _gitwt_pick_remote "$remotes" && return 0
-  grep -qxF origin <<< "$remotes" && echo origin
+# Asks the remotes whether they have <branch> right now (git ls-remote), so --fetch goes by
+# what's on the remote, not what the last fetch saw: a branch pushed since then counts, and
+# one deleted since doesn't. Asks <remote> only, if given, or else every remote. Sets
+# _gitwt_found to the remotes that have it, one per line. A remote that can't be asked stops
+# it with git's error, rather than counting as "not there". Callers declare _gitwt_found as
+# a local.
+_gitwt_ask_remotes() {
+  local branch="$1" only="${2:-}" r err rc remotes nl=$'\n'
+  _gitwt_found=""
+  if [[ -n "$only" ]]; then remotes="$only"; else remotes="$(git remote 2>/dev/null)"; fi
+  [[ -n "$remotes" ]] || return 0
+  echo "Looking for '$branch' on ${remotes//$nl/, }..."
+
+  while IFS= read -r r; do
+    [[ -n "$r" ]] || continue
+    err="$(git ls-remote --exit-code --heads "$r" "refs/heads/$branch" 2>&1 >/dev/null)"
+    rc=$?
+    if (( rc == 0 )); then
+      # $nl, not $'\n': zsh doesn't expand $'...' inside "${x:+...}"
+      _gitwt_found+="${_gitwt_found:+$nl}$r"
+    elif (( rc == 2 )); then
+      if git show-ref --verify --quiet "refs/remotes/$r/$branch"; then
+        echo "Note: '$branch' has been deleted from '$r'. Your copy '$r/$branch' is left from an earlier fetch; 'git fetch --prune $r' clears such copies." >&2
+      fi
+    else
+      echo "Error: could not ask '$r' whether it has '$branch'." >&2
+      [[ -n "$err" ]] && echo "$err" >&2
+      echo "Check the network and 'git remote -v', or leave out --fetch to go by your last fetch." >&2
+      return 1
+    fi
+  done <<< "$remotes"
+  return 0
 }
 
-# Fetches <branch> from <remote> into its remote-tracking ref, <remote>/<branch>
+# Fetches <branch> from <remote> into its remote-tracking ref, <remote>/<branch>. On failure
+# says so, and names a copy left from an earlier fetch when that's what's in the way: git
+# can't have both origin/feature and origin/feature/x.
 _gitwt_fetch_branch() {
-  git fetch -q "$1" "+refs/heads/${2}:refs/remotes/${1}/${2}"
+  local remote="$1" branch="$2" part
+  echo "Fetching '$branch' from '$remote'..."
+  git fetch -q "$remote" "+refs/heads/${branch}:refs/remotes/${remote}/${branch}" && return 0
+
+  echo "Error: could not fetch '$branch' from '$remote'." >&2
+  part="$branch"
+  while [[ "$part" == */* ]]; do
+    part="${part%/*}"
+    if git show-ref --verify --quiet "refs/remotes/$remote/$part"; then
+      echo "Tip: '$remote/$part', left from an earlier fetch, is in the way. 'git fetch --prune $remote' removes it if it's gone from '$remote'." >&2
+      return 1
+    fi
+  done
+  if [[ -n "$(git for-each-ref --count=1 --format=x "refs/remotes/$remote/$branch/" 2>/dev/null)" ]]; then
+    echo "Tip: branches under '$remote/$branch/', left from an earlier fetch, are in the way. 'git fetch --prune $remote' removes them if they're gone from '$remote'." >&2
+  fi
+  return 1
 }
 
 # Works out what `--from <base>` names for a new branch: a local branch, a remote branch
-# (origin/main), a tag or commit, or a branch only a remote has (develop → origin/develop).
-# Sets base_branch, and base_is_local=1 for a local branch, which --fetch then compares with
-# its remote. With <fetch> set to 1, remote bases are fetched first. Callers declare
-# base_branch and base_is_local as locals.
+# (origin/main), a branch only a remote has (develop → origin/develop), or a tag or commit.
+# A name that's both a remote branch and a tag or commit stops, asking which. Sets
+# base_branch, and base_is_local=1 for a local branch, which --fetch then compares with its
+# remote. With <fetch> set to 1, remote bases are looked up on the remote and fetched first.
+# Callers declare base_branch and base_is_local as locals.
 _gitwt_resolve_base() {
-  local from="$1" do_fetch="$2" _gitwt_remote="" _gitwt_rest="" remote="" remotes=""
+  local from="$1" do_fetch="$2" _gitwt_remote="" _gitwt_rest="" _gitwt_found=""
+  local remote="" remotes="" is_commit=0
   base_is_local=0
 
   if git show-ref --verify --quiet "refs/heads/$from"; then
@@ -387,11 +432,7 @@ _gitwt_resolve_base() {
 
   if _gitwt_split_remote_ref "$from"; then
     if (( do_fetch )); then
-      echo "Fetching '$_gitwt_rest' from '$_gitwt_remote'..."
-      if ! _gitwt_fetch_branch "$_gitwt_remote" "$_gitwt_rest"; then
-        echo "Error: could not fetch '$_gitwt_rest' from '$_gitwt_remote'." >&2
-        return 1
-      fi
+      _gitwt_fetch_branch "$_gitwt_remote" "$_gitwt_rest" || return 1
     fi
     if git show-ref --verify --quiet "refs/remotes/$from"; then
       base_branch="$from"
@@ -401,26 +442,38 @@ _gitwt_resolve_base() {
     return 1
   fi
 
-  if git rev-parse --verify --quiet "$from^{commit}" >/dev/null; then
-    (( do_fetch )) && echo "Note: --fetch only applies to branches, so it's ignored for '$from'." >&2
-    base_branch="$from"
-    return 0
+  git rev-parse --verify --quiet "$from^{commit}" >/dev/null && is_commit=1
+
+  if (( do_fetch )); then
+    _gitwt_ask_remotes "$from" || return 1
+    remotes="$_gitwt_found"
+  else
+    remotes="$(_gitwt_remotes_with_branch "$from")"
   fi
 
-  if (( do_fetch )) && remote="$(_gitwt_fetch_remote)"; then
-    # git's error is hidden: if the remote doesn't have it either, the error below says so
-    echo "Looking for '$from' on '$remote'..."
-    _gitwt_fetch_branch "$remote" "$from" 2>/dev/null
+  if [[ -n "$remotes" ]] && (( is_commit )); then
+    echo "Error: '$from' is both a branch on '${remotes%%$'\n'*}' and a tag or commit here." >&2
+    echo "Say which: --from ${remotes%%$'\n'*}/$from for the branch, or --from refs/tags/$from for a tag." >&2
+    return 1
   fi
-  remotes="$(_gitwt_remotes_with_branch "$from")"
+
   if [[ -n "$remotes" ]]; then
     if ! remote="$(_gitwt_pick_remote "$remotes")"; then
       echo "Error: base '$from' is on more than one remote: ${remotes//$'\n'/, }." >&2
       echo "Name one, e.g.: --from ${remotes%%$'\n'*}/$from" >&2
       return 1
     fi
+    if (( do_fetch )); then
+      _gitwt_fetch_branch "$remote" "$from" || return 1
+    fi
     echo "'$from' isn't a local branch — using '$remote/$from'."
     base_branch="$remote/$from"
+    return 0
+  fi
+
+  if (( is_commit )); then
+    (( do_fetch )) && echo "Note: --fetch only applies to branches, so it's ignored for '$from'." >&2
+    base_branch="$from"
     return 0
   fi
 
@@ -432,7 +485,7 @@ _gitwt_resolve_base() {
 
 _gitwt_new() {
   local branch="" from_branch="" do_fetch=0
-  local _gitwt_remote="" _gitwt_rest="" typed_remote_ref="" remote="" remotes=""
+  local _gitwt_remote="" _gitwt_rest="" _gitwt_found="" typed_remote_ref="" remote="" remotes=""
   local fetched_from="" track_ref="" base_branch="" base_is_local=0 upstream="" remote_ref=""
 
   while [[ $# -gt 0 ]]; do
@@ -487,7 +540,11 @@ _gitwt_new() {
   # Branch already exists locally — just attach a worktree, no branch creation
   if git show-ref --verify --quiet "refs/heads/$branch"; then
     if [[ -n "$typed_remote_ref" ]]; then
-      echo "Note: local branch '$branch' already exists, so it's used as is. It may differ from '$typed_remote_ref'." >&2
+      if (( do_fetch )); then
+        echo "Note: local branch '$branch' already exists, so it's used as is and --fetch is ignored. It may differ from '$typed_remote_ref'." >&2
+      else
+        echo "Note: local branch '$branch' already exists, so it's used as is. It may differ from '$typed_remote_ref'." >&2
+      fi
     elif [[ -n "$from_branch" || "$do_fetch" -eq 1 ]]; then
       echo "Note: --from and --fetch are ignored when the branch already exists." >&2
     fi
@@ -497,28 +554,29 @@ _gitwt_new() {
     return $?
   fi
 
-  # Not local, but a remote has it: track that instead of starting a new branch
+  # Not local, but a remote has it: track that instead of starting a new branch. With --fetch,
+  # the remote is asked first, so this goes by what's on it now, --from or not.
   if [[ -n "$typed_remote_ref" ]]; then
     if (( do_fetch )); then
-      echo "Fetching '$branch' from '$remote'..."
-      if ! _gitwt_fetch_branch "$remote" "$branch"; then
-        echo "Error: could not fetch '$branch' from '$remote'." >&2
+      _gitwt_ask_remotes "$branch" "$remote" || return 1
+      if [[ -z "$_gitwt_found" ]]; then
+        echo "Error: '$remote' has no branch '$branch'." >&2
         return 1
       fi
+      _gitwt_fetch_branch "$remote" "$branch" || return 1
       fetched_from="$remote"
-    fi
-    if ! git show-ref --verify --quiet "refs/remotes/$typed_remote_ref"; then
+    elif ! git show-ref --verify --quiet "refs/remotes/$typed_remote_ref"; then
       echo "Error: '$typed_remote_ref' isn't a known remote branch. Add --fetch to look for it on '$remote'." >&2
       return 1
     fi
     track_ref="$typed_remote_ref"
   else
-    if (( do_fetch )) && [[ -z "$from_branch" ]] && remote="$(_gitwt_fetch_remote)"; then
-      # git's error is hidden: most new branches aren't on the remote yet
-      echo "Looking for '$branch' on '$remote'..."
-      _gitwt_fetch_branch "$remote" "$branch" 2>/dev/null && fetched_from="$remote"
+    if (( do_fetch )); then
+      _gitwt_ask_remotes "$branch" || return 1
+      remotes="$_gitwt_found"
+    else
+      remotes="$(_gitwt_remotes_with_branch "$branch")"
     fi
-    remotes="$(_gitwt_remotes_with_branch "$branch")"
     if [[ -n "$remotes" ]]; then
       if ! remote="$(_gitwt_pick_remote "$remotes")"; then
         echo "Error: '$branch' is on more than one remote: ${remotes//$'\n'/, }." >&2
@@ -536,11 +594,7 @@ _gitwt_new() {
 
   if [[ -n "$track_ref" ]]; then
     if (( do_fetch )) && [[ "$fetched_from" != "$remote" ]]; then
-      echo "Fetching '$branch' from '$remote'..."
-      if ! _gitwt_fetch_branch "$remote" "$branch"; then
-        echo "Error: could not fetch '$branch' from '$remote'." >&2
-        return 1
-      fi
+      _gitwt_fetch_branch "$remote" "$branch" || return 1
       fetched_from="$remote"
     fi
     echo "Branch '$branch' is on '$remote' — creating a local branch that tracks '$track_ref' at: $worktree_path"

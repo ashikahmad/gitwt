@@ -91,9 +91,8 @@ _gitwt_complete_branches_or_remote() {
   done
 
   if [[ -n "$remote" ]]; then
-    refs=("${(@f)$(git for-each-ref --format='%(refname)' "refs/remotes/$remote" 2>/dev/null)}")
-    refs=("${(@)refs#refs/remotes/$remote/}")
-    refs=("${(@)${(@)refs:#HEAD}:#}")
+    _gitwt_remote_branch_names "$remote" "${remotes[@]}"
+    refs=("${reply[@]}")
     if (( only_new )); then
       local_branches=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)}")
       refs=("${(@)refs:|local_branches}")
@@ -108,17 +107,45 @@ _gitwt_complete_branches_or_remote() {
 
   # Typed something no local branch starts with: offer the branches only a remote has, by
   # their local name, which gitwt new tracks. Only matching ones show, so the list stays short.
+  # Only names gitwt new can settle: on one remote, or on checkout.defaultRemote.
   if (( only_new )) && [[ -n "$PREFIX" ]] && (( compstate[nmatches] == 0 )); then
+    local default n
+    local -A count on_default
+    default="$(git config --get checkout.defaultRemote 2>/dev/null)"
+    for r in "${remotes[@]}"; do
+      _gitwt_remote_branch_names "$r" "${remotes[@]}"
+      for n in "${reply[@]}"; do
+        count[$n]=$(( ${count[$n]:-0} + 1 ))
+        [[ "$r" == "$default" ]] && on_default[$n]=1
+      done
+    done
     local_branches=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)}")
-    refs=("${(@f)$(git for-each-ref --format='%(refname:lstrip=3)' refs/remotes 2>/dev/null)}")
-    refs=("${(@u)${(@)refs:|local_branches}}")
-    refs=("${(@)${(@)refs:#HEAD}:#}")
+    refs=()
+    for n in "${(@k)count}"; do
+      [[ "${count[$n]}" == 1 || -n "${on_default[$n]}" ]] || continue
+      (( ${local_branches[(Ie)$n]} )) || refs+=("$n")
+    done
     (( ${#refs} )) && _multi_parts / refs
   fi
 
   prefixes=("${(@)remotes/%//}")
   (( ${#prefixes} )) && compadd -S '' -- "${prefixes[@]}"
   return 1
+}
+
+# Sets reply to <remote>'s branch names, without the remote (feature/x for origin/feature/x),
+# leaving out HEAD and the branches of any other remote listed after it whose name starts with
+# <remote>/ (with remotes "up" and "up/stream", up/stream/x is up/stream's, not up's).
+_gitwt_remote_branch_names() {
+  local remote="$1" r
+  shift
+  local -a refs
+  refs=("${(@f)$(git for-each-ref --format='%(refname)' "refs/remotes/$remote" 2>/dev/null)}")
+  for r in "$@"; do
+    [[ "$r" == "$remote/"* ]] && refs=("${(@)refs:#refs/remotes/$r/*}")
+  done
+  refs=("${(@)refs#refs/remotes/$remote/}")
+  reply=("${(@)${(@)refs:#HEAD}:#}")
 }
 
 # `move` — branches with a worktree, except the main repo's, which can't be moved

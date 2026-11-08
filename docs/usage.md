@@ -139,10 +139,11 @@ gitwt new origin/fix/teammates-branch             # the same, naming the remote
 
 When `<branch>` isn't local, gitwt looks for it in your remote-tracking branches (`origin/<branch>` and so on). If one remote has it, you get a local branch of the same name that tracks it, like `git switch <branch>` does. You can also name it with the remote, `gitwt new origin/<branch>`; the local branch and the folder are still called `<branch>`.
 
-- **Without `--fetch`,** gitwt only knows what your last fetch saw, and says so. A branch pushed since then isn't found, so `gitwt new` starts a new branch instead. Add `--fetch` to ask the remote first.
+- **Without `--fetch`,** gitwt only knows what your last fetch saw, and says so. A branch pushed since then isn't found, so `gitwt new` starts a new branch instead.
+- **With `--fetch`,** gitwt asks each remote whether it has `<branch>` right now, then fetches it from the one that does. A branch pushed since your last fetch is found; one deleted since isn't, and gitwt says your old copy is left over (`git fetch --prune` clears those). If a remote can't be reached, or the fetch fails, gitwt stops with git's error rather than starting a new branch.
 - **On more than one remote,** gitwt stops and asks you to name one (`gitwt new upstream/<branch>`), unless `checkout.defaultRemote` names one of them.
-- **With `--from`,** gitwt stops: a branch that's already on the remote isn't a new branch. Leave out `--from` to work on it, or pick another name.
-- **If a local branch of that name exists,** it's used as is, even when you type `origin/<branch>`; gitwt notes that it may differ from the remote.
+- **With `--from`,** gitwt stops: a branch that's already on the remote isn't a new branch. Leave out `--from` to work on it, or pick another name. With `--fetch` too, this goes by what's on the remote now.
+- **If a local branch of that name exists,** it's used as is, even when you type `origin/<branch>`, and `--fetch` is ignored; gitwt notes that it may differ from the remote.
 
 **`--from <base>`** can be anything git can branch from. `--from=<base>` also works.
 
@@ -150,8 +151,10 @@ When `<branch>` isn't local, gitwt looks for it in your remote-tracking branches
 |---|---|---|
 | A local branch | `--from develop` | Fetched and compared with its remote; see below |
 | A remote branch | `--from origin/develop` | Fetched first, then used |
-| A branch only a remote has | `--from develop`, with no local `develop` | Fetched first, then `origin/develop` is used |
+| A branch only a remote has | `--from develop`, with no local `develop` | Looked up on each remote, fetched from the one that has it, then used (`origin/develop`) |
 | A tag or commit | `--from v1.2`, `--from 3f9c2e1` | Ignored, with a note |
+
+If a name is both a tag (or commit) and a branch only a remote has, gitwt stops and asks you to say which: `--from origin/develop` for the branch, or `--from refs/tags/develop` for the tag.
 
 A new branch never takes its base as its upstream, even when the base is a remote branch, so `git push -u origin <branch>` sets it up the usual way.
 
@@ -547,7 +550,7 @@ Files gitwt reads:
 - subcommands after `gitwt `,
 - for `new`: local branches that don't have a worktree yet, plus `--from`, `--fetch` and one `origin/` entry per remote; after `--from`, local branches and the same remote entries,
 - remote branches once the word starts with a remote (`origin/<Tab>`), one path part at a time (`feature/`, `fix/`, …), so hundreds of them stay easy to pick from; for `new`, only those without a local branch,
-- for `new`, when nothing local matches what you've typed, branches only a remote has, by their local name (`gitwt new teammate<Tab>`),
+- for `new`, when nothing local matches what you've typed, branches only a remote has, by their local name (`gitwt new teammate<Tab>`); a name on several remotes is left out unless `checkout.defaultRemote` is one of them, since `gitwt new` would ask which,
 - for `switch` and `remove`: branches that have a worktree, plus `--branch` for `remove`,
 - for `move`: branches that have a worktree, except the main repo's, then folders for the second argument,
 - for `list`: `-l`, `--long`, `-s` and `--short`.
@@ -570,7 +573,12 @@ Source it after `compinit` in `~/.zshrc`; the installer adds it at the end, whic
 | `'x' already exists on 'origin'` | You used `--from`, but `x` isn't new | Leave out `--from` to work on it, or pick another name |
 | `'origin/x' is a remote branch, so --from doesn't apply` | Same, naming the remote | Leave out `--from` |
 | `could not determine current branch` | You're on a detached HEAD, or not in a git repo | Use `--from <base>`, or `cd` into the repo |
-| `could not fetch 'x' from 'origin'` | `--fetch` failed, or the remote has no branch `x` | Check the name, the network and `git remote -v` |
+| `could not fetch 'x' from 'origin'` | `--fetch` failed | Check the network and `git remote -v`; follow the tip below it, if any |
+| `'origin/feature', left from an earlier fetch, is in the way` | A branch deleted on the remote still has a local copy, and git can't have both `origin/feature` and `origin/feature/x` | `git fetch --prune origin` |
+| `could not ask 'origin' whether it has 'x'` | With `--fetch`, a remote couldn't be reached | Check the network and `git remote -v`, or leave out `--fetch` |
+| `'origin' has no branch 'x'` | You typed `origin/x --fetch`, and the remote doesn't have `x` | Check the name; without `origin/`, gitwt starts a new branch |
+| `'x' has been deleted from 'origin'` | A note: your copy `origin/x` is from an earlier fetch | `git fetch --prune origin` clears such copies |
+| `'x' is both a branch on 'origin' and a tag or commit` | `--from x` could mean either | `--from origin/x` or `--from refs/tags/x` |
 | `gitwt.path can't use shell variables` | The template has `$HOME` or similar | Use `~` or a full path |
 | `gitwt.path must contain {slug} or {branch}` | Every worktree would get one folder | Add `{slug}` or `{branch}` |
 | `gitwt.path has an unknown placeholder` | A typo such as `{rpeo}` | Use `{repo}`, `{slug}` or `{branch}` |

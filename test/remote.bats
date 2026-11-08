@@ -16,7 +16,7 @@ remote_only_branch() {
   local branch="$1" remote="${2:-origin}"
   git switch -q -c "$branch"
   git commit -q --allow-empty -m "on $branch"
-  git push -q "$remote" "$branch"
+  git push -q "$remote" "refs/heads/$branch:refs/heads/$branch"
   git switch -q main
   git branch -q -D "$branch"
 }
@@ -136,7 +136,9 @@ upstream_of() { git rev-parse --abbrev-ref --symbolic-full-name "$1@{upstream}" 
 @test "remote: origin/<branch> --fetch that isn't on the remote → error" {
   run "$GITWT_RUNNER" new origin/nope --fetch
   assert_failure
-  assert_output --partial "could not fetch 'nope' from 'origin'"
+  assert_output --partial "'origin' has no branch 'nope'"
+  run git show-ref --verify --quiet refs/heads/nope
+  assert_failure
 }
 
 @test "remote: origin/<branch> when the local branch exists uses it, with a note" {
@@ -190,6 +192,7 @@ upstream_of() { git rev-parse --abbrev-ref --symbolic-full-name "$1@{upstream}" 
   remote_only_branch feature/x
   run "$GITWT_RUNNER" new feature/x
   assert_success
+  assert_equal "$(upstream_of feature/x)" "origin/feature/x"
   assert_equal "$(cat "$TEST_WORK_DIR/worktrees/myrepo/feature-x/.env")" "SECRET"
 }
 
@@ -303,4 +306,124 @@ upstream_of() { git rev-parse --abbrev-ref --symbolic-full-name "$1@{upstream}" 
   run "$GITWT_RUNNER" new feat --from dev --fetch
   assert_success
   assert_equal "$(git rev-parse feat)" "$(git rev-parse origin/develop)"
+}
+
+# ── second review: --fetch goes by what's on the remote ────────────────────────
+
+# Adds a second remote "upstream" that this repo and the other clone both know
+add_upstream() {
+  git init -q --bare "$TEST_WORK_DIR/upstream.git"
+  git remote add upstream "$TEST_WORK_DIR/upstream.git"
+}
+
+@test "review: --fetch with an unreachable remote stops, nothing created" {
+  remote_only_branch feature/x
+  git remote set-url origin "$TEST_WORK_DIR/nowhere.git"
+  run "$GITWT_RUNNER" new feature/x --fetch
+  assert_failure
+  assert_output --partial "could not ask 'origin' whether it has 'feature/x'"
+  run git show-ref --verify --quiet refs/heads/feature/x
+  assert_failure
+  [[ ! -e "$TEST_WORK_DIR/worktrees/myrepo/feature-x" ]]
+}
+
+@test "review: --from <remote-only branch> --fetch with an unreachable remote stops" {
+  remote_only_branch develop
+  git remote set-url origin "$TEST_WORK_DIR/nowhere.git"
+  run "$GITWT_RUNNER" new feat --from develop --fetch
+  assert_failure
+  assert_output --partial "could not ask 'origin'"
+  run git show-ref --verify --quiet refs/heads/feat
+  assert_failure
+}
+
+@test "review: --from <branch only on a second remote> --fetch uses its latest commit" {
+  add_upstream
+  git switch -q -c develop
+  git commit -q --allow-empty -m d1
+  git push -q upstream develop
+  git switch -q main
+  git branch -q -D develop
+  local other="$TEST_WORK_DIR/up-clone" tip
+  git clone -q -b develop "$TEST_WORK_DIR/upstream.git" "$other"
+  git -C "$other" -c user.email=t@t -c user.name=t commit -q --allow-empty -m d2
+  git -C "$other" push -q origin develop
+  tip="$(git -C "$other" rev-parse HEAD)"
+  run "$GITWT_RUNNER" new feat --from develop --fetch
+  assert_success
+  assert_output --partial "using 'upstream/develop'"
+  assert_equal "$(git rev-parse feat)" "$tip"
+}
+
+@test "review: --from with --fetch stops when the branch was pushed but never fetched" {
+  push_from_elsewhere feature/x >/dev/null
+  run "$GITWT_RUNNER" new feature/x --from main --fetch
+  assert_failure
+  assert_output --partial "'feature/x' already exists on 'origin'"
+  run git show-ref --verify --quiet refs/heads/feature/x
+  assert_failure
+}
+
+@test "review: a leftover origin/feature blocking origin/feature/x stops, with a prune tip" {
+  git push -q origin main:refs/heads/feature
+  git fetch -q origin
+  local other="$TEST_WORK_DIR/elsewhere"
+  git clone -q "$ORIGIN" "$other"
+  git -C "$other" push -q origin :refs/heads/feature
+  git -C "$other" -c user.email=t@t -c user.name=t commit -q --allow-empty -m fx
+  git -C "$other" push -q origin HEAD:refs/heads/feature/x
+  run "$GITWT_RUNNER" new feature/x --fetch
+  assert_failure
+  assert_output --partial "could not fetch 'feature/x' from 'origin'"
+  assert_output --partial "'origin/feature', left from an earlier fetch, is in the way"
+  assert_output --partial "git fetch --prune origin"
+  run git show-ref --verify --quiet refs/heads/feature/x
+  assert_failure
+  [[ ! -e "$TEST_WORK_DIR/worktrees/myrepo/feature-x" ]]
+}
+
+@test "review: a branch deleted on the remote, with --fetch, is new again, with a note" {
+  remote_only_branch old
+  git push -q origin :refs/heads/old
+  git update-ref refs/remotes/origin/old "$(git rev-parse main)"
+  run "$GITWT_RUNNER" new old --fetch
+  assert_success
+  assert_output --partial "'old' has been deleted from 'origin'"
+  assert_output --partial "git fetch --prune origin"
+  assert_output --partial "Creating 'old' from 'main'"
+  assert_equal "$(upstream_of old)" ""
+}
+
+@test "review: origin/<branch> --fetch that the remote doesn't have → error" {
+  git update-ref refs/remotes/origin/gone "$(git rev-parse main)"
+  run "$GITWT_RUNNER" new origin/gone --fetch
+  assert_failure
+  assert_output --partial "'origin' has no branch 'gone'"
+}
+
+@test "review: --from naming both a tag and a remote-only branch asks which" {
+  git tag develop
+  remote_only_branch develop
+  run "$GITWT_RUNNER" new feat --from develop
+  assert_failure
+  assert_output --partial "both a branch on 'origin' and a tag or commit"
+  assert_output --partial "--from origin/develop"
+  assert_output --partial "--from refs/tags/develop"
+  run git show-ref --verify --quiet refs/heads/feat
+  assert_failure
+
+  run "$GITWT_RUNNER" new feat --from origin/develop
+  assert_success
+  assert_equal "$(git rev-parse feat)" "$(git rev-parse origin/develop)"
+  run "$GITWT_RUNNER" new feat2 --from refs/tags/develop
+  assert_success
+  assert_equal "$(git rev-parse feat2)" "$(git rev-parse 'refs/tags/develop^{commit}')"
+}
+
+@test "review: origin/<branch> --fetch when the local branch exists says --fetch is ignored" {
+  remote_only_branch feature/x
+  git branch feature/x main
+  run "$GITWT_RUNNER" new origin/feature/x --fetch
+  assert_success
+  assert_output --partial "--fetch is ignored"
 }
