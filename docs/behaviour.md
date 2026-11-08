@@ -9,7 +9,7 @@ Each case has an ID (`NEW-3`, `RM-8`) so PRs, tests and reviews can point at it.
 | ✓ | Same as today |
 | ✎ | Today accepts this input but does something else |
 | ✚ | Today rejects this input or has no way to express it |
-| ? | Open: needs a decision (see [Open questions](#open-questions)) |
+| ? | Open: needs a decision (see [Decisions](#decisions)) |
 
 ---
 
@@ -367,9 +367,9 @@ Completion never offers bare remote branch names: type `ori<Tab>` for `origin/`,
 
 ---
 
-## Open questions
+## Decisions
 
-| ID | Question | Proposed |
+| ID | Question | Answer |
 |---|---|---|
 | Q1 | `new x --fetch` when, after the fetch, `x` is on no remote: new branch, or fail? | **Decided:** new branch (NEW-33). To require the remote branch, write `origin/x` (NEW-13) |
 | Q2 | `--fetch` with a local base that's behind its upstream: start from the upstream (NEW-33), or fail and name `--from origin/b`? | **Decided:** start from the upstream. Asking for a fetch means asking for the latest. The same applies to an existing branch (NEW-4): it's fast-forwarded, and if it's checked out somewhere, gitwt fails for safety rather than move it |
