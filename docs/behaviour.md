@@ -34,7 +34,7 @@ gitwt new <branch> [--from <base>] [--fetch]
     --from <base> where a NEW branch starts: local branch, <remote>/<branch>, tag or commit
     --fetch       fetch the remote(s) involved first, then use the latest: an existing branch is fast-forwarded
                   to its upstream, a new branch starts from its base as brought up to date
-gitwt switch <target>                     cd into that worktree                       (alias: sw)
+gitwt switch <branch>                     cd into that branch's worktree              (alias: sw)
 gitwt remove <target> [--branch] [--force]       (alias: rm)
     --branch      also delete the branch, only if none of its commits would be lost
     --force       go ahead even if files in the worktree, or (with --branch) commits, are lost
@@ -42,8 +42,8 @@ gitwt move <target> [<path>]              move it to <path>, or to where gitwt.p
 gitwt list [-l | -s]                      every worktree; -l adds changes, -s is branch and path only   (alias: ls)
 gitwt version                             also -v, --version
 gitwt help [<command>]                    also -h, --help, or gitwt alone; <command> --help for one command
-<target> = a branch that has a worktree, or a path (. .. or starting with / ./ ../ ~): a worktree's folder,
-           or for switch, any folder inside one
+<target> = (remove, move) a branch that has a worktree, or a worktree's top folder: . .. or a path
+           starting with / ./ ../ ~
 ```
 
 ---
@@ -87,21 +87,21 @@ These apply to every command, before any command-specific case.
 
 ## Naming a worktree: `<target>`
 
-`switch`, `remove` and `move` act on an existing worktree, and name it the same way. A branch name is looked up first among local branches, since worktrees hold only local branches.
+`switch`, `remove` and `move` act on an existing worktree. All three take a branch; `remove` and `move` also take a path, since that's the only way to name a detached worktree. `switch` doesn't: to go to a folder, `cd` is shorter and clearer. A branch name is looked up first among local branches, since worktrees hold only local branches.
 
 | ID | `<target>` | Result | |
 |---|---|---|---|
 | TGT-1 | A branch with a worktree, including a local branch literally named `origin/x` | That worktree | ✓ |
-| TGT-2 | A path that is a worktree's top folder | That worktree. This is how detached worktrees are named | ✚ |
-| TGT-3 | A path inside a worktree, but not its top folder | `switch`: `cd` to exactly that folder. `remove`, `move`: fail, naming the top folder, so `remove ./src` can't remove the whole worktree by accident | ✚ |
-| TGT-4 | Nested worktrees (one inside another's folder) | The innermost one that contains the path | ✚ |
-| TGT-5 | A path that isn't in any worktree | Fail: `not a worktree of this repo` | ✚ |
+| TGT-2 | `remove`, `move`: a path that is a worktree's top folder | That worktree. This is how detached worktrees are named | ✚ |
+| TGT-3 | `remove`, `move`: a path inside a worktree, but not its top folder | Fail, naming the top folder, so `remove ./src` can't remove the whole worktree by accident | ✚ |
+| TGT-4 | `switch` with a path | Fail: `switch takes a branch; to go to a folder, use: cd <path>` (SW-2) | ✎ |
+| TGT-5 | `remove`, `move`: a path that isn't a worktree's top folder or inside one | Fail: `not a worktree of this repo` | ✚ |
 | TGT-6 | A local branch with no worktree | Fail: `'x' has no worktree`. `switch` and `move` name `gitwt new x`; `remove` names `git branch -d x` to delete the branch | ✎ |
 | TGT-7 | Not a local branch, but a known remote branch | Fail. `switch` names `gitwt new x`; `remove` and `move` say there's nothing here to act on | ✎ |
 | TGT-8 | `<remote>/<x>` form, and no local branch of that name | Fail: worktrees hold local branches. If `x` has a worktree, name `gitwt <command> x`. `switch` otherwise names `gitwt new <remote>/<x>` | ✎ |
 | TGT-9 | Nothing of that name | Fail, naming `gitwt list` | ✓ |
-| TGT-10 | A stale worktree, by branch or by its old folder | Fail, naming `git worktree prune` (but see RM-12) | ✓ by branch, ✚ by folder |
-| TGT-11 | The label `list` shows for a detached worktree, `(detached:abc1234)` | Fail, printing that worktree's full path, which is how to name it | ✚ |
+| TGT-10 | A stale worktree, by branch, or (`remove`, `move`) by its old folder | Fail, naming `git worktree prune` (but see RM-12) | ✓ by branch, ✚ by folder |
+| TGT-11 | The label `list` shows for a detached worktree, `(detached:abc1234)` | Fail. `switch` prints `cd <full path>`; `remove` and `move` print the full path, which is how to name it | ✚ |
 
 ---
 
@@ -220,7 +220,7 @@ gitwt runs `git fetch --prune <remote>` once for each remote involved, before de
 ## `gitwt switch`
 
 ```text
-gitwt switch <target>      # alias: sw
+gitwt switch <branch>      # alias: sw
 ```
 
 `cd`s into that worktree.
@@ -228,11 +228,11 @@ gitwt switch <target>      # alias: sw
 | ID | Case | Result | |
 |---|---|---|---|
 | SW-1 | A branch with a worktree (TGT-1), the main repo included | `cd` into its top folder | ✓ |
-| SW-2 | A worktree's path (TGT-2, TGT-3) | `cd` into that folder | ✚ |
+| SW-2 | A path (TGT-4) | Fail, printing the `cd` command to use | ✎ |
 | SW-3 | You're already at its top folder | Stay, and say `already here` | ✎ |
 | SW-4 | You're in a subfolder of it | `cd` to its top folder | ✓ |
-| SW-5 | No `<target>` | Fail with usage | ✓ |
-| SW-6 | Anything else | As [`<target>`](#naming-a-worktree-target) says: fail, naming the command to use | ✎ |
+| SW-5 | No `<branch>` | Fail with usage | ✓ |
+| SW-6 | Anything else | As [`<target>`](#naming-a-worktree-target) says for a branch: fail, naming the command to use | ✎ |
 
 ---
 
@@ -356,7 +356,7 @@ Runs after `gitwt new` adds a worktree (NEW-50), never otherwise.
 | CMP-6 | `gitwt remove <Tab>` | Branches with a worktree, except the main repo's; `--branch`, `--force` | ✎ |
 | CMP-7 | `gitwt move <Tab>` | Branches with a worktree, except the main repo's; then folders | ✓ |
 | CMP-8 | `gitwt list <Tab>` | `-l`, `--long`, `-s`, `--short` | ✓ |
-| CMP-9 | `gitwt switch ./<Tab>` (also `remove`, `move`) | Worktree folders | ✚ |
+| CMP-9 | `gitwt remove ./<Tab>` (also `move`) | Worktree folders. `switch` offers none | ✚ |
 
 Completion never offers bare remote branch names: type `ori<Tab>` for `origin/`, then the path.
 
@@ -377,12 +377,13 @@ Completion never offers bare remote branch names: type `ori<Tab>` for `origin/`,
 |---|---|---|
 | Q1 | `new x --fetch` when, after the fetch, `x` is on no remote: new branch, or fail? | **Decided:** new branch (NEW-33). To require the remote branch, write `origin/x` (NEW-13) |
 | Q2 | `--fetch` with a local base that's behind its upstream: start from the upstream (NEW-33), or fail and name `--from origin/b`? | **Decided:** start from the upstream. Asking for a fetch means asking for the latest. The same applies to an existing branch (NEW-4): it's fast-forwarded, and if it's checked out somewhere, gitwt fails for safety rather than move it |
-| Q3 | Should `switch`, `remove` and `move` accept a worktree's path (TGT-2 to TGT-5, TGT-11, SW-2, RM-11, MV-12, CMP-9)? It's the only way to name a detached worktree | **Decided:** yes. `remove` and `move` only accept a worktree's top folder, so a path inside one can't remove or move it by accident |
+| Q3 | Should `switch`, `remove` and `move` accept a worktree's path (TGT-2 to TGT-5, TGT-11, SW-2, RM-11, MV-12, CMP-9)? It's the only way to name a detached worktree | **Decided:** `remove` and `move` yes, top folder only, so a path inside one can't remove or move it by accident. `switch` no: `cd <path>` does the same, shorter and clearer |
 | Q4 | `remove x --branch --force` with commits that would be lost: delete it too, or still fail (RM-10)? | **Decided:** delete it (RM-10a). The user asked for the branch gone and forced it. gitwt says what was lost and how to get it back |
 | Q5 | `remove` on a stale worktree: remove git's record (RM-12), or fail naming `git worktree prune` (today)? | **Decided:** remove that one record. The user asked for it gone, and the folder is already gone. `git worktree prune` would also prune other entries. A locked one still fails (RM-13) |
 | Q6 | `gitwt help <command>`: print that command's usage (VH-3), or fail as an extra argument? | **Decided:** print it, the same as `gitwt <command> --help` (ALL-7) |
 | Q7 | A local branch literally named `origin/x` while `origin/x` is also a remote branch (NEW-22): fail, or prefer the local branch? | **Decided:** prefer the local branch everywhere, as git does, and say so in `new` and `--from`, naming the rename that reaches the remote's branch |
 | Q8 | `gitwt rm` (today it prints help): add `rm` as an alias of `remove`, like `sw`, `mv` and `ls`, or only suggest `remove` (ALL-9)? | **Decided:** add the alias |
+| Q9 | `remove x --branch` on a squash- or rebase-merged branch, whose commits are in neither its upstream nor the main branch | **Decided:** refuse (RM-10); `--force` deletes it. Detecting squash merges would be guessing |
 
 ---
 
