@@ -7,7 +7,7 @@ Each case has an ID (`NEW-3`, `RM-8`) so PRs, tests and reviews can point at it.
 | Mark | Meaning |
 |---|---|
 | ✓ | Same as today |
-| ✎ | Today accepts this input but does something else |
+| ✎ | Today does something else, or does the same with different wording or exit code |
 | ✚ | Today rejects this input or has no way to express it |
 | ? | Open: needs a decision (see [Decisions](#decisions)) |
 
@@ -17,10 +17,10 @@ Each case has an ID (`NEW-3`, `RM-8`) so PRs, tests and reviews can point at it.
 
 Every case below follows these. When a case seems to need an exception, the case is wrong.
 
-1. **One rule per parameter.** Each parameter follows one rule, which you can read off the cheat sheet. The rule may look at the repo (is this branch local?), but other flags never change it.
+1. **One rule per parameter.** Each parameter follows one rule, which you can read off the cheat sheet. The rule may look at the repo (is this branch local?), but other parameters never change it. Two flags are themselves rules about the others: `--fetch` (Principle 3) and `--force`, which means "go ahead even though something is lost", wherever gitwt would otherwise refuse because of a loss.
 2. **Do it, or fail.** gitwt goes ahead only when it can do what was asked confidently and safely. Otherwise it fails, changes nothing, and says which command to run instead. It doesn't guess, and it doesn't ask; the one exception is approving a repo's setup script (SETUP-2).
-3. **No network unless `--fetch`.** `--fetch` means "I want the latest": fetch first, then decide with the same rules, using the fresh information. So an existing branch is brought up to its upstream (NEW-4), and a new branch starts from its base as brought up to date (NEW-33), each only when that's a fast-forward and nothing checked out would move. Otherwise it fails.
-4. **Nothing half-done.** When gitwt fails, nothing has changed, except remote-tracking branches that `--fetch` already updated. Exceptions, each of which says so when it happens: setup after a worktree is added (SETUP-1, SETUP-4) keeps the worktree, and a branch that can't be deleted after its worktree was removed (RM-14).
+3. **No network unless `--fetch`.** `--fetch` means "I want the latest": fetch first, then decide by the same rules, and bring what you named up to date. An existing branch is fast-forwarded to its upstream (NEW-4); a new branch starts from its base as brought up to date (NEW-33); a tag is fetched by name (NEW-37). Each happens only when it's a fast-forward and nothing checked out would move. Otherwise it fails.
+4. **Nothing half-done.** When gitwt fails, nothing has changed, except what `--fetch` already fetched (remote-tracking branches, tags, `FETCH_HEAD`). Exceptions, each of which says so when it happens: setup after a worktree is added (SETUP-1, SETUP-4) keeps the worktree, and a branch that can't be deleted after its worktree was removed (RM-14).
 5. **The obvious reading wins.** If a user would read a command one way and gitwt does another, gitwt is wrong, however well it's documented.
 
 ---
@@ -42,7 +42,8 @@ gitwt move <target> [<path>]              move it to <path>, or to where gitwt.p
 gitwt list [-l | -s]                      every worktree; -l adds changes, -s is branch and path only   (alias: ls)
 gitwt version                             also -v, --version
 gitwt help [<command>]                    also -h, --help, or gitwt alone; <command> --help for one command
-<target> = a branch that has a worktree, or a worktree's folder: . .. or a path starting with / ./ ../ ~
+<target> = a branch that has a worktree, or a path (. .. or starting with / ./ ../ ~): a worktree's folder,
+           or for switch, any folder inside one
 ```
 
 ---
@@ -55,7 +56,7 @@ gitwt help [<command>]                    also -h, --help, or gitwt alone; <comm
 | Known remote branch | A remote-tracking branch on this machine, `refs/remotes/<remote>/<name>`, as of the last fetch. `<remote>/HEAD` never counts |
 | `<remote>/<x>` form | A name that starts with a configured remote's name and a slash, such as `origin/feature/x` |
 | Fetch remote | The remote `--fetch` contacts when nothing else names one: `checkout.defaultRemote` if set; else the only remote; else `origin` if it exists; else none |
-| Path | `.`, `..`, or anything starting with `/`, `./`, `../` or `~`. Everything else is a branch name, so `feature/x` is never a folder |
+| Path (in `<target>`) | `.`, `..`, or anything starting with `/`, `./`, `../` or `~`. Everything else is a branch name, so a `<target>` of `feature/x` is never a folder. `move`'s destination `<path>` is always a path (MV-3) |
 | Main repo | The repo's first worktree, the one `git clone` made. It can be switched to, but not removed or moved |
 | Stale worktree | One git has registered whose folder is gone |
 
@@ -76,9 +77,9 @@ These apply to every command, before any command-specific case.
 | ALL-7 | `-h` or `--help` after a command | Print that command's usage, exit 0. Nothing else runs | ✚ |
 | ALL-8 | A required argument is missing: `gitwt new`, `remove`, `move` with nothing | Fail with usage | ✓ |
 | ALL-9 | An unknown command, such as `gitwt nwe foo` | Fail: `unknown command 'nwe'`, suggesting the closest command if there's a clear one, then the command list. Exit 1. (`rm` is an alias of `remove`, not an unknown command) | ✎ |
-| ALL-10 | Not inside a git repo | Fail: `not inside a git repo`. Same wording from every command | ✎ |
+| ALL-10 | Not inside a git repo | Fail: `not inside a git repo`. Same wording from every command except `help` and `version`, which work anywhere | ✎ |
 | ALL-11 | Running in bash older than 4 | Fail with the "not supported" message, for every command, including help and version | ✓ |
-| ALL-12 | Arguments are checked before anything else, including `--fetch` | A typo never costs a fetch, and never changes anything | ✚ |
+| ALL-12 | Checks before `--fetch` | Syntax (ALL-1 to ALL-8, NEW-49), and anything a fetch can't change: local `x` with `--from` (NEW-6), a detached HEAD with no `--from` (NEW-26), `--from b` that's neither local nor a tag or commit while a known remote has `b` (NEW-38). These fail before any network. Anything that depends on a remote (NEW-12, NEW-13, NEW-31, NEW-36, NEW-37) is decided after the fetch | ✚ |
 
 **Output:** progress goes to stdout, errors and notes to stderr. Exit 0 means it did what was asked; 1 means it failed. A failure starts with `Error:` and ends with the command(s) to run instead, when there are any.
 
@@ -92,14 +93,14 @@ These apply to every command, before any command-specific case.
 |---|---|---|---|
 | TGT-1 | A branch with a worktree, including a local branch literally named `origin/x` | That worktree | ✓ |
 | TGT-2 | A path that is a worktree's top folder | That worktree. This is how detached worktrees are named | ✚ |
-| TGT-3 | A path inside a worktree, but not its top folder | `switch`: that worktree. `remove`, `move`: fail, naming the top folder, so `remove ./src` can't remove the whole worktree by accident | ✚ |
+| TGT-3 | A path inside a worktree, but not its top folder | `switch`: `cd` to exactly that folder. `remove`, `move`: fail, naming the top folder, so `remove ./src` can't remove the whole worktree by accident | ✚ |
 | TGT-4 | Nested worktrees (one inside another's folder) | The innermost one that contains the path | ✚ |
 | TGT-5 | A path that isn't in any worktree | Fail: `not a worktree of this repo` | ✚ |
-| TGT-6 | A local branch with no worktree | Fail: `'x' has no worktree`. `switch` names `gitwt new x`; `remove` names `git branch -d x` to delete the branch | ✎ |
+| TGT-6 | A local branch with no worktree | Fail: `'x' has no worktree`. `switch` and `move` name `gitwt new x`; `remove` names `git branch -d x` to delete the branch | ✎ |
 | TGT-7 | Not a local branch, but a known remote branch | Fail. `switch` names `gitwt new x`; `remove` and `move` say there's nothing here to act on | ✎ |
 | TGT-8 | `<remote>/<x>` form, and no local branch of that name | Fail: worktrees hold local branches. If `x` has a worktree, name `gitwt <command> x`. `switch` otherwise names `gitwt new <remote>/<x>` | ✎ |
 | TGT-9 | Nothing of that name | Fail, naming `gitwt list` | ✓ |
-| TGT-10 | A stale worktree, by branch or by its old folder | Fail, naming `git worktree prune` (but see RM-11) | ✓ |
+| TGT-10 | A stale worktree, by branch or by its old folder | Fail, naming `git worktree prune` (but see RM-12) | ✓ by branch, ✚ by folder |
 | TGT-11 | The label `list` shows for a detached worktree, `(detached:abc1234)` | Fail, printing that worktree's full path, which is how to name it | ✚ |
 
 ---
@@ -127,8 +128,9 @@ New branches never get an upstream. Branches gitwt creates to match a remote bra
 | NEW-1 | `new x` | `x` has a worktree, the main repo included | Switch to it: `'x' already has a worktree — switching to it` | ✎ |
 | NEW-2 | `new x` | `x` has a worktree, but its folder is gone | Fail, naming `git worktree prune` | ✎ |
 | NEW-3 | `new x` | `x` has no worktree | Add one, set it up, switch to it | ✓ |
-| NEW-4 | `new x --fetch` | `x` exists and has an upstream | Fetch the upstream's remote, then exactly as `gitwt new <upstream>` (NEW-14 to NEW-17b): same commit, use `x`; behind with no worktree, add one and fast-forward `x` in it; behind with a worktree, fail for safety, naming the `merge --ff-only` command (NEW-16); ahead, use `x` and say so; diverged, fail | ✎ |
-| NEW-5 | `new x --fetch` | `x` exists, no upstream | Note `'x' has no upstream, so nothing was fetched`, then NEW-1 or NEW-3 | ✎ |
+| NEW-4 | `new x --fetch` | `x` exists and tracks a remote branch `<remote>/<u>` (`u` may differ from `x`), still there after the fetch | Fetch `<remote>`, then compare `x` with `<remote>/<u>`: same commit, use `x` (NEW-1 or NEW-3); behind with no worktree, fast-forward `x` and add one (as NEW-15); behind with a worktree, fail for safety, naming `git -C <path> merge --ff-only <remote>/<u>` (as NEW-16); ahead, use `x` and say so; diverged, fail (as NEW-17b) | ✎ |
+| NEW-4a | `new x --fetch` | `x`'s upstream is gone after the fetch (deleted on the remote, often after a merge) | Use `x` (NEW-1 or NEW-3), noting `'<remote>/<u>' no longer exists` | ✎ |
+| NEW-5 | `new x --fetch` | `x` exists, with no upstream or a local branch as upstream | Note `'x' has no remote upstream, so nothing was fetched`, then NEW-1 or NEW-3 | ✎ |
 | NEW-6 | `new x --from b` | `x` exists | Fail: `'x' already exists`. To use it: `gitwt new x` | ✎ |
 
 ### A branch only a remote has
@@ -150,17 +152,17 @@ These cases apply when local `x` tracks `<remote>/x` or has no upstream; when it
 | NEW-12 | `new origin/x` | `origin/x` not known | Fail: `not on 'origin' as of your last fetch`. Add `--fetch` | ✎ |
 | NEW-13 | `new origin/x --fetch` | After the fetch, `origin` has no `x` | Fail: `'origin' has no branch 'x'` | ✎ |
 | NEW-14 | `new origin/x` | Local `x` at the same commit as `origin/x` | Use local `x`: NEW-1 or NEW-3 | ✎ |
-| NEW-15 | `new origin/x` | Local `x` behind `origin/x`, no worktree | Add a worktree for `x`, then fast-forward `x` to `origin/x` in it, and say so. If adding the worktree fails, `x` hasn't moved | ✎ |
+| NEW-15 | `new origin/x` | Local `x` behind `origin/x`, no worktree | Fast-forward `x` to `origin/x` and add a worktree for it, and say so. If either step fails, `x` is back where it was and there's no new worktree | ✎ |
 | NEW-16 | `new origin/x` | Local `x` behind `origin/x`, has a worktree | Fail: `'x' is checked out at <path>, N commits behind 'origin/x'`. To update it there: `git -C <path> merge --ff-only origin/x` | ✎ |
 | NEW-17a | `new origin/x` | Local `x` ahead of `origin/x` (it has everything `origin/x` has) | Use local `x`: NEW-1 or NEW-3, noting `'x' is N commits ahead of 'origin/x'` | ✎ |
 | NEW-17b | `new origin/x` | Local `x` diverged from `origin/x` | Fail: `'x' and 'origin/x' have diverged`. For your local `x`: `gitwt new x`. For `origin/x` on a new branch: `gitwt new <name> --from origin/x` | ✎ |
 | NEW-18 | `new origin/x` | Local `x` tracks something other than `origin/x` | Fail: `'x' tracks '<other>'`. For your local `x`: `gitwt new x` | ✎ |
-| NEW-19 | `new origin/x` | Local `x` has no upstream, and NEW-14, NEW-15 or NEW-17a applies | As that case, and set `x` to track `origin/x`; say so | ✎ |
+| NEW-19 | `new origin/x` | Local `x` has no upstream, and NEW-14, NEW-15 or NEW-17a applies | As that case, and set `x` to track `origin/x`; say so. If the case fails, the upstream isn't changed | ✎ |
 | NEW-20 | `new origin/x` | Local `x`'s worktree folder is gone | As NEW-2 | ✎ |
 | NEW-21 | `new origin/x --from b` | Any | Fail: `--from` is only for new branches, and `origin/x` isn't new | ✎ |
 | NEW-22 | `new origin/x`, or `--from origin/x` | A local branch is literally named `origin/x`, and `origin/x` is also a known remote branch | Use the local branch, as git does: NEW-1 or NEW-3 (or NEW-28 for `--from`). Note `using your local branch 'origin/x', not the remote's 'x'`; to reach the remote's, rename the local one with `git branch -m origin/x <new-name>` | ✎ |
-| NEW-23 | `new origin/x` | A local branch named `origin/x`, and no known remote branch `origin/x` | Use the local branch: NEW-1 or NEW-3 | ✓ |
-| NEW-24 | `new origin/HEAD` | Any | Fail: `HEAD` isn't a branch | ✎ |
+| NEW-23 | `new origin/x` | A local branch named `origin/x`, and no known remote branch `origin/x` | Use the local branch: NEW-1 or NEW-3 | ✓ for NEW-3, ✎ for NEW-1 |
+| NEW-24 | `new origin/HEAD`, `--from origin/HEAD` | Any | Fail: `HEAD` isn't a branch. Name `<remote>/<branch>` | ✎ |
 
 ### A new branch
 
@@ -173,6 +175,7 @@ These cases apply when local `x` tracks `<remote>/x` or has no upstream; when it
 | NEW-29 | `new x --from origin/b` | `x` new; `origin/b` known | Create `x` from `origin/b`, no upstream | ✚ |
 | NEW-30 | `new x --from v1.2` | `x` new; a tag or commit | Create `x` from it, no upstream | ✚ |
 | NEW-31 | `new x --from b` | `b` doesn't exist in any of those forms | Fail. If a known remote has `b`, name `--from <remote>/b` | ✎ |
+| NEW-31a | `new x --from origin/b` | `origin/b` isn't known | Fail: `not on 'origin' as of your last fetch`. Add `--fetch` | ✎ |
 
 ### `--fetch` with a new branch
 
@@ -185,7 +188,7 @@ The base is `--from b`, or the current branch when there's no `--from`. Its upst
 | NEW-34 | same | The base and its upstream have diverged | Fail: `'b' and 'origin/b' have diverged`. Name `--from origin/b`, and `--from b` without `--fetch` | ✎ |
 | NEW-35 | same | The local base has no upstream, its upstream was deleted on the remote, or its upstream is a local branch | Start from the local base; note that there's no remote upstream to compare with | ✎ |
 | NEW-36 | `new x --from origin/b --fetch` | `x` new | Start from `origin/b` as just fetched. If `origin` has no `b`, fail | ✚ |
-| NEW-37 | `new x --from v1.2 --fetch` | A tag or commit | Fetch the fetch remote, then NEW-30. If the remote moved a tag you have, git refuses to update it, and gitwt fails (NEW-44) | ✚ |
+| NEW-37 | `new x --from v1.2 --fetch` | A tag or commit | A tag: fetch it by name from the fetch remote (a plain `git fetch` skips tags no branch reaches, and keeps an old copy of a tag that moved). If the remote moved a tag you already have, fail, naming `git fetch <remote> --force tag v1.2`. If the remote doesn't have it, use yours and say so. A commit: fetch the fetch remote, then NEW-30 | ✚ |
 | NEW-38 | `new x --from b --fetch` | `b` isn't local, but a known remote has `b` | Fail before fetching (ALL-12), naming `--from <remote>/b --fetch` | ✎ |
 | NEW-39 | `new x --from b --fetch` | After the fetch, a remote has `x` | NEW-10: fail | ✎ |
 
@@ -197,10 +200,10 @@ gitwt runs `git fetch --prune <remote>` once for each remote involved, before de
 |---|---|---|---|
 | NEW-40 | `<remote>/<x>` form | That remote | ✎ |
 | NEW-41 | Local `x` (NEW-4) | `x`'s upstream remote | ✎ |
-| NEW-42 | Bare `x` that isn't local | The fetch remote, plus the base's upstream remote | ✎ |
+| NEW-42 | Bare `x` that isn't local | The fetch remote, plus the base's upstream remote. Afterwards NEW-7 to NEW-9 decide as usual: the fetched remote fresh, any other remote as of its last fetch, and said so | ✎ |
 | NEW-43 | `--from <remote>/b` | That remote too | ✚ |
-| NEW-44 | A fetch fails (unreachable, no access, refused update) | Fail with git's error, before anything else happens | ✓ |
-| NEW-45 | No fetch remote, and nothing else names one (no remotes, or several with no `origin` and no `checkout.defaultRemote`) | Fail: `no remote to fetch`. Name `gitwt new <remote>/x --fetch`, or `gitwt new x` without `--fetch` | ✎ |
+| NEW-44 | A fetch fails (unreachable, no access, refused update) | Fail with git's error, before anything else happens | ✓ for `<remote>/<x>`, ✚ for an existing branch (today ignores `--fetch`) |
+| NEW-45 | No fetch remote (no remotes, or several with no `origin` and no `checkout.defaultRemote`) | If `x` is known on exactly one remote, fetch that one. Otherwise fail: `no remote to fetch`, naming `gitwt new <remote>/x --fetch` for each remote, or `gitwt new x` without `--fetch`. The base's upstream remote alone doesn't count: it says where the base comes from, not where `x` lives | ✎ |
 | NEW-46 | A single-branch or shallow clone, whose fetch config doesn't cover every branch | `x` (and `--from <remote>/b`) is also fetched by name from that remote, so whether it exists there is known for sure | ✎ |
 
 ### Always
@@ -225,7 +228,7 @@ gitwt switch <target>      # alias: sw
 | ID | Case | Result | |
 |---|---|---|---|
 | SW-1 | A branch with a worktree (TGT-1), the main repo included | `cd` into its top folder | ✓ |
-| SW-2 | A worktree's path (TGT-2, TGT-3) | `cd` into its top folder | ✚ |
+| SW-2 | A worktree's path (TGT-2, TGT-3) | `cd` into that folder | ✚ |
 | SW-3 | You're already at its top folder | Stay, and say `already here` | ✎ |
 | SW-4 | You're in a subfolder of it | `cd` to its top folder | ✓ |
 | SW-5 | No `<target>` | Fail with usage | ✓ |
@@ -242,7 +245,7 @@ gitwt remove <target> [--branch] [--force]
 Removes that worktree. `rm` is an alias. If you're inside it, you end up in the main repo, but only once removal is going ahead.
 
 **What each flag means:**
-- **`--branch`** also deletes the branch, only when none of its commits would be lost: they're all in its upstream, or, if it has none, in the main repo's current branch. Where you run the command doesn't matter. It's checked before anything is removed.
+- **`--branch`** also deletes the branch, only when none of its commits would be lost: they're all in its upstream; or, if it has no upstream or its upstream is gone, in the main repo's current branch (its HEAD commit when detached). Where you run the command doesn't matter. It's checked before anything is removed. A squash- or rebase-merged branch has commits that are in neither, so `--branch` refuses it (RM-10); `--force` deletes it.
 - **`--force`** goes ahead even when something is lost: files in the worktree (uncommitted changes, untracked files, changed or worktree-only listed files, initialised submodules), and, with `--branch`, commits that are only on that branch (RM-10a). It doesn't unlock a locked worktree.
 
 | ID | Case | Result | |
@@ -253,7 +256,7 @@ Removes that worktree. `rm` is an alias. If you're inside it, you end up in the 
 | RM-4 | Initialised submodules in the worktree | Fail, naming `--force` | ✎ |
 | RM-5 | `--force` | Remove it, whatever RM-2 to RM-4 would have said | ✓ |
 | RM-6 | A locked worktree, with or without `--force` | Fail, naming `git worktree unlock <path>` | ✎ |
-| RM-7 | The main repo, by branch or path | Fail: the main repo can't be removed | ✓ |
+| RM-7 | The main repo, by branch or path | Fail: the main repo can't be removed | ✓ by branch, ✚ by path |
 | RM-8 | You're inside it | Once removal goes ahead, you end up in the main repo, and it says so. If it fails, you stay where you were | ✓ |
 | RM-9 | `--branch`, nothing would be lost | Remove the worktree, then delete the branch | ✎ |
 | RM-10 | `--branch` without `--force`, the branch has commits that would be lost | Fail before removing anything: `'x' has N commits not in '<upstream or main repo's branch>'`. Name `gitwt remove x --branch --force` to delete them, or `gitwt remove x` to keep the branch | ✎ |
@@ -288,7 +291,7 @@ Moves that worktree, with everything in it, as it is.
 | MV-8 | Destination exists | Fail. Without `<path>`, say what's using it | ✓ |
 | MV-9 | Destination inside the worktree, or a file where a folder must be | Fail | ✓ |
 | MV-10 | Locked, on another drive, or contains submodules | Fail, naming the way out (unlock; or remove and `git worktree add` there) | ✓ |
-| MV-11 | The main repo, by branch or path | Fail: the main repo can't be moved | ✓ |
+| MV-11 | The main repo, by branch or path | Fail: the main repo can't be moved | ✓ by branch, ✚ by path |
 | MV-12 | A detached worktree, no `<path>` | Fail: there's no branch for `gitwt.path` to place. Name `gitwt move <its path> <new path>` | ✚ |
 | MV-13 | A failed move | Parent folders it created are removed again | ✓ |
 | MV-14 | Anything else | As [`<target>`](#naming-a-worktree-target) says | ✎ |
@@ -313,6 +316,7 @@ Shows every worktree from git's own records. No network.
 | LS-6 | A stale worktree | Shows `(stale)`, and ends with a tip naming `git worktree prune` | ✓ |
 | LS-7 | A detached worktree | Shows `(detached:<sha>)` | ✓ |
 | LS-8 | A bare main repo | Shows `(bare)` | ✓ |
+| LS-9 | A locked worktree | Shows `(locked)` | ✓ |
 
 ---
 
@@ -322,7 +326,7 @@ Shows every worktree from git's own records. No network.
 |---|---|---|---|
 | VH-1 | `gitwt version`, `-v`, `--version` | Print the version | ✓ |
 | VH-2 | `gitwt help`, `-h`, `--help`, or `gitwt` alone | Print the command summary | ✓ |
-| VH-3 | `gitwt help <command>` | Print that command's usage, the same as `gitwt <command> --help` (ALL-7) | ✚ |
+| VH-3 | `gitwt help <command>` | Print that command's usage, the same as `gitwt <command> --help` (ALL-7). An alias (`rm`, `sw`, `mv`, `ls`) gives its command's usage; an unknown command fails as ALL-9 | ✚ |
 | VH-4 | Any other extra argument | Fail with usage | ✎ |
 
 ---
@@ -334,8 +338,8 @@ Runs after `gitwt new` adds a worktree (NEW-50), never otherwise.
 | ID | Case | Result | |
 |---|---|---|---|
 | SETUP-1 | `.worktreeinclude` in the main repo | Copy the listed, ignored files from the main repo; never overwrite. A file that can't be copied: warn, carry on, keep the worktree, exit 1 at the end | ✓ |
-| SETUP-2 | A setup script that isn't approved, with a terminal | Ask once whether to run it and remember that version. The only question gitwt asks | ✓ |
-| SETUP-3 | A setup script that isn't approved, no terminal | Skip it, printing the exact `git config gitwt.postCreateApproved <hash>` command to approve this version, and how to run it by hand in the worktree | ✎ |
+| SETUP-2 | A setup script that isn't approved, with a terminal | Ask once whether to run it and remember that version. The only question gitwt asks. Declining skips it and exits 0 | ✓ |
+| SETUP-3 | A setup script that isn't approved, no terminal | Skip it, printing the exact `git config gitwt.postCreateApproved <hash>` command to approve this version, and how to run it by hand in the worktree. Exit 0 | ✎ |
 | SETUP-4 | The setup script fails | Keep the worktree, switch to it, exit 1 | ✓ |
 
 ---
@@ -390,7 +394,7 @@ One PR per command, each with a test per case ID, and the guide updated for that
 2. **`remove`** (RM), on top of 1.
 3. **`move`** (MV), on top of 1.
 4. **`list`, `version`, `help`** (LS, VH), on top of 1.
-5. **`new`**, split if it's too large to review in one: local and new branches with `--from` (NEW-1 to 6, 25 to 31, 47 to 50); then remote branches and `--fetch` (NEW-7 to 24, 32 to 46), reworking PR #13. Setup (SETUP-3) and completion (CMP) go with the command they belong to.
+5. **`new`**, split if it's too large to review in one: local and new branches with `--from` (NEW-1 to 3, 6, 25 to 31a, 47 to 50); then remote branches and `--fetch` (NEW-4, 4a, 5, 7 to 24, 32 to 46), reworking PR #13. Setup (SETUP-3) and completion (CMP) go with the command they belong to.
 
 ### How this spec is reviewed
 
