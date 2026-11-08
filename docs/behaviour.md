@@ -158,7 +158,7 @@ These cases apply when local `x` tracks `<remote>/x` or has no upstream; when it
 | NEW-19 | `new origin/x` | Local `x` has no upstream, and NEW-14, NEW-15 or NEW-17a applies | As that case, and set `x` to track `origin/x`; say so | ✎ |
 | NEW-20 | `new origin/x` | Local `x`'s worktree folder is gone | As NEW-2 | ✎ |
 | NEW-21 | `new origin/x --from b` | Any | Fail: `--from` is only for new branches, and `origin/x` isn't new | ✎ |
-| NEW-22 | `new origin/x`, or `--from origin/x` | A local branch is literally named `origin/x`, and `origin/x` is also a known remote branch | Fail: it could mean either. Rename the local branch with `git branch -m origin/x <new-name>`, after which both work | ✎ ? Q7 |
+| NEW-22 | `new origin/x`, or `--from origin/x` | A local branch is literally named `origin/x`, and `origin/x` is also a known remote branch | Use the local branch, as git does: NEW-1 or NEW-3 (or NEW-28 for `--from`). Note `using your local branch 'origin/x', not the remote's 'x'`; to reach the remote's, rename the local one with `git branch -m origin/x <new-name>` | ✎ |
 | NEW-23 | `new origin/x` | A local branch named `origin/x`, and no known remote branch `origin/x` | Use the local branch: NEW-1 or NEW-3 | ✓ |
 | NEW-24 | `new origin/HEAD` | Any | Fail: `HEAD` isn't a branch | ✎ |
 
@@ -259,7 +259,7 @@ Removes that worktree. `rm` is an alias. If you're inside it, you end up in the 
 | RM-10 | `--branch` without `--force`, the branch has commits that would be lost | Fail before removing anything: `'x' has N commits not in '<upstream or main repo's branch>'`. Name `gitwt remove x --branch --force` to delete them, or `gitwt remove x` to keep the branch | ✎ |
 | RM-10a | `--branch --force`, the branch has commits that would be lost | Remove the worktree and delete the branch. Say how many commits went, and the command to get the branch back: `git branch x <sha>` | ✎ |
 | RM-11 | `--branch`, detached worktree (named by path) | Fail before removing anything: there's no branch to delete. Name `gitwt remove <path>` | ✚ |
-| RM-12 | A stale worktree (folder gone) | Remove git's record of that worktree only. With `--branch`, as RM-9 to RM-10a | ✎ ? Q5 |
+| RM-12 | A stale worktree (folder gone) | Remove git's record of that worktree only, not other stale ones. With `--branch`, as RM-9 to RM-10a | ✎ |
 | RM-13 | A stale worktree that's locked (often a drive that isn't plugged in) | As RM-6 | ✎ |
 | RM-14 | `--branch`, and git can't delete the branch after the worktree was removed (for example a ref lock) | Exit 1: `worktree removed, but 'x' was kept: <git's reason>` | ✎ |
 | RM-15 | Anything else | As [`<target>`](#naming-a-worktree-target) says | ✎ |
@@ -375,9 +375,9 @@ Completion never offers bare remote branch names: type `ori<Tab>` for `origin/`,
 | Q2 | `--fetch` with a local base that's behind its upstream: start from the upstream (NEW-33), or fail and name `--from origin/b`? | **Decided:** start from the upstream. Asking for a fetch means asking for the latest. The same applies to an existing branch (NEW-4): it's fast-forwarded, and if it's checked out somewhere, gitwt fails for safety rather than move it |
 | Q3 | Should `switch`, `remove` and `move` accept a worktree's path (TGT-2 to TGT-5, TGT-11, SW-2, RM-11, MV-12, CMP-9)? It's the only way to name a detached worktree | **Decided:** yes. `remove` and `move` only accept a worktree's top folder, so a path inside one can't remove or move it by accident |
 | Q4 | `remove x --branch --force` with commits that would be lost: delete it too, or still fail (RM-10)? | **Decided:** delete it (RM-10a). The user asked for the branch gone and forced it. gitwt says what was lost and how to get it back |
-| Q5 | `remove` on a stale worktree: remove git's record (RM-12), or fail naming `git worktree prune` (today)? | **Proposed:** remove that one record. The user asked for it gone, and the folder is already gone. `git worktree prune` would also prune other entries. A locked one still fails (RM-13) |
+| Q5 | `remove` on a stale worktree: remove git's record (RM-12), or fail naming `git worktree prune` (today)? | **Decided:** remove that one record. The user asked for it gone, and the folder is already gone. `git worktree prune` would also prune other entries. A locked one still fails (RM-13) |
 | Q6 | `gitwt help <command>`: print that command's usage (VH-3), or fail as an extra argument? | **Decided:** print it, the same as `gitwt <command> --help` (ALL-7) |
-| Q7 | A local branch literally named `origin/x` while `origin/x` is also a remote branch (NEW-22): fail, or prefer the local branch? | **Proposed:** fail in `new` and `--from`, since either reading is reasonable. As a `<target>`, the local branch is meant (TGT-1), since worktrees hold only local branches |
+| Q7 | A local branch literally named `origin/x` while `origin/x` is also a remote branch (NEW-22): fail, or prefer the local branch? | **Decided:** prefer the local branch everywhere, as git does, and say so in `new` and `--from`, naming the rename that reaches the remote's branch |
 | Q8 | `gitwt rm` (today it prints help): add `rm` as an alias of `remove`, like `sw`, `mv` and `ls`, or only suggest `remove` (ALL-9)? | **Decided:** add the alias |
 
 ---
