@@ -1,6 +1,6 @@
 # Kanban Board
 
-<!-- Config: Last Task ID: 38 -->
+<!-- Config: Last Task ID: 39 -->
 <!-- Format: v3 -->
 
 ## ⚙️ Configuration
@@ -622,3 +622,29 @@ There's no way to uninstall except by hand (the guide's Uninstall section): dele
 
 **Notes**:
 **Design**: edits users' shell config, so it deserves its own PR and review. Worktrees are plain git worktrees and stay.
+
+### TASK-039 | Pick the branch or worktree with fzf in gitwt new, remove and move
+**Status**: backlog  
+**Priority**: Medium  
+**Category**: CLI  
+**Created**: 2026-11-11  
+**Tags**: #feature  
+
+TASK-035 adds a picker to `gitwt sw` with no branch. The other commands that take a branch or worktree still need it typed out. Running them with nothing could open the same picker.
+
+**Subtasks**:
+- [ ] `gitwt new` with no branch: pick from local branches without a worktree and `<remote>/<branch>` names, so hundreds of remote branches are easy to filter; then behave exactly as `gitwt new <picked>`
+- [ ] `gitwt remove` with no target: pick a worktree (the main repo left out); flags typed with it (`--branch`, `--force`) still apply
+- [ ] `gitwt move` with no target: pick the worktree; the destination stays an argument
+- [ ] Share one picker with TASK-035: fzf when installed, numbered menu otherwise, same `gitwt.picker` setting to turn fzf off
+- [ ] Without a terminal, keep today's usage error instead of waiting for input
+- [ ] Amend the behaviour spec: Principle 2 (no asking) and the missing-argument cases (ALL-8, SW-5)
+- [ ] Add tests, help text and docs
+
+**Notes**:
+**Design**: the picker only opens when the argument is missing and there's a terminal, so every typed command behaves as the spec says. Picking a name is the same as typing it: `gitwt new` then `origin/feat/x` runs `gitwt new origin/feat/x`, with the same rules and errors. fzf stays optional.
+
+**Why**: zsh completion has to keep remote branches behind `<remote>/` prefixes to stay usable with hundreds of them (PR #13); fzf filters a flat list by any part of the name.
+
+**Related**: TASK-035 (`sw` picker, built first), PR #14 (behaviour spec).
+
