@@ -45,37 +45,107 @@ _gitwt() {
   esac
 }
 
-# `new` — suggest existing branches without worktrees, plus --from / --fetch flags
+# `new` — local branches without a worktree, plus --from / --fetch flags. Remote branches can
+# number in the hundreds, so they don't crowd that list: each remote is offered as "origin/",
+# and its branches are completed once the word starts with it, one path part at a time.
 _gitwt_complete_new() {
-  local -a flags checked_out all_branches available
+  local -a flags checked_out local_branches available
 
-  # If the previous word is --from, complete with local branch names
+  # After --from: local branches, then a remote's branches once the word starts with it
   if [[ "${words[-2]}" == "--from" ]]; then
-    all_branches=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)}")
-    compadd -a all_branches
+    local_branches=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)}")
+    _gitwt_complete_branches_or_remote 0 "${local_branches[@]}"
     return
   fi
 
-  # Suggest existing branches that don't already have a worktree
+  # Existing branches that don't already have a worktree
   checked_out=("${(@f)$(git worktree list --porcelain 2>/dev/null \
     | awk '/^branch / { sub(/^refs\/heads\//, "", $2); print $2 }')}")
-  all_branches=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)}")
+  local_branches=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)}")
+  available=("${(@)local_branches:|checked_out}")
+  available=("${(@)available:#}")
 
-  local b c skip
-  for b in "${all_branches[@]}"; do
-    skip=0
-    for c in "${checked_out[@]}"; do
-      [[ "$b" == "$c" ]] && skip=1 && break
-    done
-    (( skip )) || available+=("$b")
-  done
-  [[ ${#available[@]} -gt 0 ]] && compadd -a available
+  _gitwt_complete_branches_or_remote 1 "${available[@]}" && return
 
-  # Suggest flags not already used
+  # Flags not already used
   local used="${words[*]}"
   [[ "$used" != *"--from"* ]] && flags+=(--from)
   [[ "$used" != *"--fetch"* ]] && flags+=(--fetch)
   [[ ${#flags[@]} -gt 0 ]] && compadd -a flags
+}
+
+# Completes the given local branches plus one "<remote>/" entry per remote. Once the word
+# starts with <remote>/, completes that remote's branches instead and returns 0. With
+# <only_new> set to 1 (for the branch name, not --from), remote branches that already exist
+# locally are left out, and when nothing local matches what's typed, branches only a remote
+# has are offered by their local name.
+_gitwt_complete_branches_or_remote() {
+  local only_new="$1"; shift
+  local -a remotes prefixes refs local_branches
+  local r remote=""
+
+  remotes=("${(@f)$(git remote 2>/dev/null)}")
+  remotes=("${(@)remotes:#}")
+  for r in "${remotes[@]}"; do
+    [[ "$PREFIX" == "$r/"* && ${#r} -gt ${#remote} ]] && remote="$r"
+  done
+
+  if [[ -n "$remote" ]]; then
+    _gitwt_remote_branch_names "$remote" "${remotes[@]}"
+    refs=("${reply[@]}")
+    if (( only_new )); then
+      local_branches=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)}")
+      refs=("${(@)refs:|local_branches}")
+    fi
+    refs=("${(@)refs/#/$remote/}")
+    # One path part at a time: origin/<Tab> lists feature/, fix/, main, …
+    (( ${#refs} )) && _multi_parts / refs
+    return 0
+  fi
+
+  (( $# )) && compadd -- "$@"
+
+  # Typed something no local branch starts with: offer the branches only a remote has, by
+  # their local name, which gitwt new tracks. Only matching ones show, so the list stays short.
+  # Only names gitwt new can settle: on one remote, or on checkout.defaultRemote.
+  if (( only_new )) && [[ -n "$PREFIX" ]] && (( compstate[nmatches] == 0 )); then
+    local default n
+    local -A count on_default
+    default="$(git config --get checkout.defaultRemote 2>/dev/null)"
+    for r in "${remotes[@]}"; do
+      _gitwt_remote_branch_names "$r" "${remotes[@]}"
+      for n in "${reply[@]}"; do
+        count[$n]=$(( ${count[$n]:-0} + 1 ))
+        [[ "$r" == "$default" ]] && on_default[$n]=1
+      done
+    done
+    local_branches=("${(@f)$(git for-each-ref --format='%(refname:short)' refs/heads 2>/dev/null)}")
+    refs=()
+    for n in "${(@k)count}"; do
+      [[ "${count[$n]}" == 1 || -n "${on_default[$n]}" ]] || continue
+      (( ${local_branches[(Ie)$n]} )) || refs+=("$n")
+    done
+    (( ${#refs} )) && _multi_parts / refs
+  fi
+
+  prefixes=("${(@)remotes/%//}")
+  (( ${#prefixes} )) && compadd -S '' -- "${prefixes[@]}"
+  return 1
+}
+
+# Sets reply to <remote>'s branch names, without the remote (feature/x for origin/feature/x),
+# leaving out HEAD and the branches of any other remote listed after it whose name starts with
+# <remote>/ (with remotes "up" and "up/stream", up/stream/x is up/stream's, not up's).
+_gitwt_remote_branch_names() {
+  local remote="$1" r
+  shift
+  local -a refs
+  refs=("${(@f)$(git for-each-ref --format='%(refname)' "refs/remotes/$remote" 2>/dev/null)}")
+  for r in "$@"; do
+    [[ "$r" == "$remote/"* ]] && refs=("${(@)refs:#refs/remotes/$r/*}")
+  done
+  refs=("${(@)refs#refs/remotes/$remote/}")
+  reply=("${(@)${(@)refs:#HEAD}:#}")
 }
 
 # `move` — branches with a worktree, except the main repo's, which can't be moved

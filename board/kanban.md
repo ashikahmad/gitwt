@@ -167,13 +167,24 @@ gitwt has no setup step, so ignored files and project setup must be redone by ha
 - test/new.bats
 
 ### TASK-006 | Warn when a branch already exists only on the remote
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: High  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-08  
 **Tags**: #bug  
 
 With a fetched `origin/feature/x` and no local branch, `gitwt new feature/x` creates a new branch from the current one, with no upstream and no warning, so the remote work is missing. Raw `git worktree add <path> feature/x` tracks the remote branch instead.
+
+**Notes**:
+**Result**: `gitwt new <branch>` for a branch only a remote has creates a local branch tracking it, like `git switch <branch>`. `gitwt new origin/<branch>` does the same and names the branch and folder without the remote. `--fetch` asks the remote first, so a branch pushed since the last fetch is found and its latest commits used; without it, a note says the ref is as of the last fetch. A branch on several remotes stops unless `checkout.defaultRemote` picks one, and `--from` with a branch that's already on a remote stops, since it isn't new. Zsh completion keeps remote branches out of the main list, which can hold hundreds: it offers `origin/`, then that remote's branches one path part at a time, and bare remote-only names only when nothing local matches what's typed. After an independent review: `--fetch` asks each remote with `git ls-remote` whether it has the branch, even with `--from`, so it goes by the remote's current state; a remote that can't be reached or a failed fetch stops `gitwt new` with git's error instead of creating a fresh branch, with a `git fetch --prune` tip when a leftover copy such as `origin/feature` blocks `origin/feature/x`. A branch deleted from the remote is created new with a note. Completion leaves out bare names on several remotes and handles remote names with slashes. Done together with TASK-009, 010 and 011, which change the same code. 37 tests in test/remote.bats; 34 fail on dev's code, and 10 on the code before the review fixes.
+
+**Modified files**:
+- gitwt.sh
+- test/remote.bats
+- _gitwt
+- docs/usage.md
+- README.md
 
 ### TASK-007 | Reject unknown flags, extra arguments and unknown commands
 **Status**: backlog  
@@ -199,31 +210,60 @@ With no `.zshrc`, `.bashrc` or `.zprofile`, install.sh prints `not found — ski
 **Plan**: done as part of TASK-036, the one-line install, where a home with no shell config files is common.
 
 ### TASK-009 | Stop new branches tracking their base after --fetch
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-08  
 **Tags**: #bug  
 
 When `--fetch` branches from the remote-tracking ref (behind case, or diverged choice 1), git sets the new branch's upstream to `origin/<base>`. It prints this, but gitwt adds no explanation. `gitwt list` and `git status` then compare against the base, `git pull` pulls the base's commits, and `git push` fails with an upstream mismatch. The up-to-date, ahead-only and diverged choice 2 cases set no upstream, so behaviour is inconsistent. Tested with default `branch.autoSetupMerge`.
 
+**Notes**:
+**Result**: New branches are created with `--no-track`, so a base never becomes the upstream, whether it's local, fetched from the remote or a remote branch given to `--from`. Covered by tests in test/remote.bats.
+
+**Modified files**:
+- gitwt.sh
+- test/remote.bats
+- docs/usage.md
+
 ### TASK-010 | Accept remote refs, tags and SHAs in --from
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-08  
 **Tags**: #feature  
 
 `--from` accepts only local branches (gitwt.sh:133): `origin/main`, a tag and a SHA are all rejected. `gitwt new x --from develop --fetch` fails before fetching when develop exists only on the remote, so the "does it all in one shot" claim at README.md:22 holds only when local develop exists.
 
+**Notes**:
+**Result**: `--from` takes a local branch, a remote branch (`origin/main`), a branch only a remote has (`develop` → `origin/develop`), a tag or a commit. With `--fetch`, remote bases are looked up on each remote and fetched from the one that has it, including one never fetched before; for a tag or commit, `--fetch` is ignored with a note. A name that's both a tag or commit and a remote-only branch stops and asks for `origin/<name>` or `refs/tags/<name>`. Zsh completion after `--from` offers local branches and `origin/`, then remote branches by path part. Tags and commits aren't offered, since there can be many; they work when typed.
+
+**Modified files**:
+- gitwt.sh
+- test/remote.bats
+- _gitwt
+- docs/usage.md
+- README.md
+
 ### TASK-011 | Use the configured upstream name in --fetch
-**Status**: backlog  
+**Status**: in-review  
 **Priority**: Medium  
 **Category**: CLI  
 **Created**: 2026-11-05  
+**Started**: 2026-11-08  
 **Tags**: #bug  
 
 `--fetch` assumes the upstream has the same name as the local base (gitwt.sh:149-152). When `dev` tracks `origin/develop`, it fails with `couldn't find remote ref dev`. If an `origin/dev` also exists, it branches from that and ignores the real upstream, returning 0.
+
+**Notes**:
+**Result**: `--fetch` with a local base fetches the branch it tracks by that branch's own name (`dev` tracking `origin/develop` fetches `develop`), and compares with it, so an `origin/dev` no longer wins.
+
+**Modified files**:
+- gitwt.sh
+- test/remote.bats
+- docs/usage.md
 
 ### TASK-012 | Fix current-directory handling in gitwt remove
 **Status**: done  

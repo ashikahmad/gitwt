@@ -57,6 +57,7 @@ gitwt ls                                            # see all worktrees
 gitwt new feature/dark-mode                         # new branch off the current one, worktree, cd in
 gitwt new feature/dark-mode --from main --fetch     # fetch main first, then branch off it
 gitwt new fix/existing-branch                       # existing branch: just add a worktree
+gitwt new fix/teammates-branch --fetch              # branch on the remote: fetch it and track it
 gitwt sw main                                       # jump to another worktree
 gitwt move feature/new                              # after git branch -m: rename the folder too
 gitwt remove feature/dark-mode --branch             # remove the worktree and its branch
